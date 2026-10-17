@@ -39,6 +39,7 @@ if(CHIMEDES_BUILD_TESTS)
         Tests/ValidatorTests.cpp
         Tests/TreeBuilderTests.cpp
         Tests/SchedulerTests.cpp
+        Tests/SequencerTests.cpp
     )
     target_link_libraries(chimedes_tests PRIVATE chimedes_core)
     target_include_directories(chimedes_tests PRIVATE Tests)
@@ -59,6 +60,8 @@ if(CHIMEDES_BUILD_APP)
 
     target_sources(Chimedes PRIVATE
         Source/Main.cpp
+        Source/audio/AudioEngine.cpp
+        Source/ui/GraphView.cpp
         Source/ui/MainComponent.cpp
     )
 
@@ -77,6 +80,29 @@ if(CHIMEDES_BUILD_APP)
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags
+    )
+
+    # Herramienta de desarrollo: renderiza el grafo de demostración a WAV sin tarjeta
+    # de sonido, con el mismo motor de audio que la aplicación.
+    juce_add_console_app(ChimedesRender PRODUCT_NAME "ChimedesRender")
+
+    target_sources(ChimedesRender PRIVATE
+        Tools/RenderDemo.cpp
+        Source/audio/AudioEngine.cpp
+    )
+
+    target_compile_definitions(ChimedesRender PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+    )
+
+    target_link_libraries(ChimedesRender
+        PRIVATE
+            chimedes_core
+            juce::juce_audio_formats
+        PUBLIC
+            juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags
     )
 endif()
