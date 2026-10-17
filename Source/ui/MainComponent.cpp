@@ -12,6 +12,7 @@ namespace chimedes::ui
 namespace
 {
     constexpr int toolbarHeight = 48;
+    constexpr int inspectorWidth = 270;
 
     const juce::Colour toolbarColour { 0xff1b1d23 };
     const juce::Colour errorColour { 0xffe0a84f };
@@ -30,8 +31,8 @@ namespace
                 switch (result.validation.problem)
                 {
                     case Problem::NoNodes:      return "La pista no tiene nodos";
-                    case Problem::MissingStart: return "Falta el nodo de inicio";
-                    case Problem::MissingEnd:   return "Falta el nodo de fin";
+                    case Problem::MissingStart: return "Falta el nodo de inicio (clic derecho en un nodo)";
+                    case Problem::MissingEnd:   return "Falta el nodo de fin (clic derecho en un nodo)";
                     case Problem::Unreachable:  return "Hay nodos inalcanzables desde el inicio (en naranja)";
                     case Problem::None:         break;
                 }
@@ -41,6 +42,21 @@ namespace
         return "La pista no se puede reproducir";
     }
 }
+
+// Una entrada de deshacer: la pista antes y después del cambio.
+class MainComponent::TrackChange : public juce::UndoableAction
+{
+public:
+    TrackChange (MainComponent& ownerToUse, model::Track beforeChange, model::Track afterChange)
+        : owner (ownerToUse), before (std::move (beforeChange)), after (std::move (afterChange)) {}
+
+    bool perform() override { owner.setTrack (after); return true; }
+    bool undo() override    { owner.setTrack (before); return true; }
+
+private:
+    MainComponent& owner;
+    model::Track before, after;
+};
 
 MainComponent::MainComponent()
     : track (model::makeDemoTrack())
@@ -56,31 +72,39 @@ MainComponent::MainComponent()
     bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 44, 22);
     bpmSlider.onValueChange = [this] { engine.setBpm (bpmSlider.getValue()); };
 
-    // --- Opciones de la pista ---------------------------------------------
-    modeBox.addItemList ({ text ("Línea de tiempo"), "Algoritmo" }, 1);
-    treeBox.addItemList ({ text ("Árbol: BFS"), text ("Árbol: DFS"), text ("Árbol: Dijkstra"), text ("Árbol: Prim") }, 1);
-    traversalBox.addItemList ({ "Recorrido: BFS", "Recorrido: DFS" }, 1);
-    siblingsBox.addItemList ({ "Hermanos: en secuencia", "Hermanos: a la vez" }, 1);
-
-    modeBox.setSelectedItemIndex (0, juce::dontSendNotification);
-    treeBox.setSelectedItemIndex (0, juce::dontSendNotification);
-    traversalBox.setSelectedItemIndex (0, juce::dontSendNotification);
-    siblingsBox.setSelectedItemIndex (0, juce::dontSendNotification);
-    directedToggle.setToggleState (track.directed, juce::dontSendNotification);
-
-    for (auto* box : { &modeBox, &treeBox, &traversalBox, &siblingsBox })
-        box->onChange = [this] { rebuildSchedule(); };
-
-    directedToggle.onClick = [this] { rebuildSchedule(); };
+    newButton.onClick = [this]
+    {
+        // Pista vacía con las mismas opciones; se puede deshacer.
+        applyEdit ([] (model::Track& t)
+        {
+            t.nodes.clear();
+            t.edges.clear();
+            t.startNode = model::noNode;
+            t.endNode = model::noNode;
+        });
+    };
+    undoButton.onClick = [this] { undoManager.undo(); };
+    redoButton.onClick = [this] { undoManager.redo(); };
 
     statusLabel.setColour (juce::Label::textColourId, errorColour);
 
-    for (auto* c : std::initializer_list<juce::Component*> {
-             &playButton, &pauseButton, &stopButton, &bpmLabel, &bpmSlider, &modeBox, &treeBox,
-             &traversalBox, &siblingsBox, &directedToggle, &statusLabel, &graphView })
-        addAndMakeVisible (c);
+    // --- Edición -----------------------------------------------------------
+    const EditCallbacks editCallbacks {
+        [this] (const EditCallbacks::Change& c) { applyEdit (c); },
+        [this] { beginGesture(); },
+        [this] (const EditCallbacks::Change& c) { updateGesture (c); },
+        [this] { endGesture(); }
+    };
 
+    graphView.callbacks = editCallbacks;
+    inspector.callbacks = editCallbacks;
+    graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (track, node); };
     graphView.setTrack (&track);
+
+    for (auto* c : std::initializer_list<juce::Component*> {
+             &playButton, &pauseButton, &stopButton, &bpmLabel, &bpmSlider, &newButton,
+             &undoButton, &redoButton, &statusLabel, &graphView, &inspector })
+        addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
     const auto audioError = deviceManager.initialiseWithDefaultDevices (0, 2);
@@ -93,29 +117,89 @@ MainComponent::MainComponent()
     else if (deviceManager.getCurrentAudioDevice() == nullptr)
         audioWarning = text ("No se encontró ningún dispositivo de salida de audio");
 
-    rebuildSchedule();
+    undoManager.addChangeListener (this);
+    trackChanged();
+    updateUndoButtons();
 
     setWantsKeyboardFocus (true);
-    setSize (1440, 760);
+    setSize (1400, 800);
     startTimerHz (30);
 }
 
 MainComponent::~MainComponent()
 {
     stopTimer();
+    undoManager.removeChangeListener (this);
     deviceManager.removeAudioCallback (&audioPlayer);
     audioPlayer.setSource (nullptr);
 }
 
+// ---------------------------------------------------------------------------
+// Cambios a la pista
+// ---------------------------------------------------------------------------
+
+void MainComponent::applyEdit (const EditCallbacks::Change& change)
+{
+    auto after = track;
+    change (after);
+
+    if (after == track)
+        return;
+
+    undoManager.beginNewTransaction();
+    undoManager.perform (new TrackChange (*this, track, std::move (after)));
+}
+
+void MainComponent::beginGesture()
+{
+    gestureStart = track;
+}
+
+void MainComponent::updateGesture (const EditCallbacks::Change& change)
+{
+    if (! gestureStart.has_value())
+        gestureStart = track;
+
+    change (track);
+    trackChanged();
+}
+
+void MainComponent::endGesture()
+{
+    if (! gestureStart.has_value())
+        return;
+
+    auto before = std::move (*gestureStart);
+    gestureStart.reset();
+
+    if (before == track)
+        return;
+
+    // El cambio ya está aplicado; la acción solo lo registra para deshacer.
+    undoManager.beginNewTransaction();
+    undoManager.perform (new TrackChange (*this, std::move (before), track));
+}
+
+void MainComponent::setTrack (const model::Track& newTrack)
+{
+    track = newTrack;
+    trackChanged();
+}
+
+void MainComponent::trackChanged()
+{
+    rebuildSchedule();
+    inspector.refresh (track, graphView.getSelectedNode());
+    graphView.repaint();
+}
+
+void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    updateUndoButtons();
+}
+
 void MainComponent::rebuildSchedule()
 {
-    track.mode = modeBox.getSelectedItemIndex() == 0 ? model::PlaybackMode::Timeline
-                                                     : model::PlaybackMode::Algorithm;
-    track.treeMethod = static_cast<model::TreeMethod> (treeBox.getSelectedItemIndex());
-    track.traversal = static_cast<model::Traversal> (traversalBox.getSelectedItemIndex());
-    track.siblings = static_cast<model::SiblingMode> (siblingsBox.getSelectedItemIndex());
-    track.directed = directedToggle.getToggleState();
-
     const auto result = engine::buildSchedule (track);
 
     schedule = result.ok() ? std::make_shared<const engine::Schedule> (*result.schedule) : nullptr;
@@ -123,19 +207,20 @@ void MainComponent::rebuildSchedule()
 
     graphView.setSchedule (schedule);
     graphView.setUnreachable (result.validation.unreachable);
-    const auto problem = describe (result);
+
+    const auto problem = track.nodes.empty() ? juce::String() : describe (result);
     statusLabel.setText (problem.isNotEmpty() ? problem : audioWarning, juce::dontSendNotification);
-
-    updateControlsEnabled();
 }
 
-void MainComponent::updateControlsEnabled()
+void MainComponent::updateUndoButtons()
 {
-    const bool algorithm = track.mode == model::PlaybackMode::Algorithm;
-    treeBox.setEnabled (algorithm);
-    traversalBox.setEnabled (algorithm);
-    siblingsBox.setEnabled (algorithm);
+    undoButton.setEnabled (undoManager.canUndo());
+    redoButton.setEnabled (undoManager.canRedo());
 }
+
+// ---------------------------------------------------------------------------
+// Transporte y teclado
+// ---------------------------------------------------------------------------
 
 void MainComponent::togglePlayPause()
 {
@@ -152,7 +237,6 @@ void MainComponent::timerCallback()
     const auto beatInCycle = cycle > 0.0 ? std::fmod (position, cycle) : 0.0;
 
     graphView.setPlayhead (beatInCycle, engine.isPlaying());
-
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
 
     // Libera los horarios viejos unas dos veces por segundo.
@@ -162,14 +246,39 @@ void MainComponent::timerCallback()
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    const auto command = juce::ModifierKeys::commandModifier;  // Ctrl en Windows y Linux, Cmd en macOS
+
     if (key == juce::KeyPress::spaceKey)
     {
         togglePlayPause();
         return true;
     }
 
+    if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
+    {
+        graphView.deleteSelection();
+        return true;
+    }
+
+    if (key == juce::KeyPress ('z', command, 0))
+    {
+        undoManager.undo();
+        return true;
+    }
+
+    if (key == juce::KeyPress ('z', command | juce::ModifierKeys::shiftModifier, 0)
+        || key == juce::KeyPress ('y', command, 0))
+    {
+        undoManager.redo();
+        return true;
+    }
+
     return false;
 }
+
+// ---------------------------------------------------------------------------
+// Distribución
+// ---------------------------------------------------------------------------
 
 void MainComponent::paint (juce::Graphics& g)
 {
@@ -193,15 +302,15 @@ void MainComponent::resized()
     place (stopButton, 70);
     bar.removeFromLeft (10);
     place (bpmLabel, 36);
-    place (bpmSlider, 150);
+    place (bpmSlider, 160);
+    bar.removeFromLeft (16);
+    place (newButton, 64);
+    place (undoButton, 80);
+    place (redoButton, 72);
     bar.removeFromLeft (10);
-    place (modeBox, 140);
-    place (treeBox, 130);
-    place (traversalBox, 130);
-    place (siblingsBox, 170);
-    place (directedToggle, 90);
     statusLabel.setBounds (bar);
 
+    inspector.setBounds (area.removeFromRight (inspectorWidth));
     graphView.setBounds (area);
 }
 

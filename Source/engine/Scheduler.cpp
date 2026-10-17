@@ -1,6 +1,7 @@
 #include "engine/Scheduler.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <unordered_set>
 
@@ -18,6 +19,18 @@ namespace
     NoteEvent makeEvent (const model::Node& node, double startBeat)
     {
         return { startBeat, node.durationBeats, node.pitches, node.velocity, node.id };
+    }
+
+    // Espera en pulsos correspondiente a una arista. Con ajuste al pulso, se redondea a
+    // la subdivisión más cercana, sin bajar de una subdivisión para conservar el orden.
+    double waitBeats (double pixels, double quantize)
+    {
+        const auto beats = model::pixelsToBeats (pixels);
+
+        if (quantize <= 0.0)
+            return beats;
+
+        return std::max (quantize, std::round (beats / quantize) * quantize);
     }
 
     void sortEvents (Schedule& schedule)
@@ -67,7 +80,7 @@ namespace
         for (const auto id : order)
         {
             if (id != tree.root)
-                time += model::pixelsToBeats (tree.parentEdgeLength.at (id));
+                time += waitBeats (tree.parentEdgeLength.at (id), track.quantizeBeats);
 
             const auto& node = *track.findNode (id);
             schedule.events.push_back (makeEvent (node, time));
@@ -116,7 +129,7 @@ namespace
                     shortest = std::min (shortest, tree.parentEdgeLength.at (sibling));
                 }
 
-                time += model::pixelsToBeats (shortest);
+                time += waitBeats (shortest, track.quantizeBeats);
             }
 
             for (const auto member : group)
