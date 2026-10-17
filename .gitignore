@@ -1,0 +1,14 @@
+# Compilación
+build*/
+cmake-build-*/
+out/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Herramientas
+compile_commands.json
+.cache/
