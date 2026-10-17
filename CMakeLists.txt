@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# El código fuente está en UTF-8 (textos con acentos). Visual Studio necesita saberlo.
+add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
 option(CHIMEDES_BUILD_APP   "Compilar la aplicación de escritorio (requiere JUCE)" ON)
 option(CHIMEDES_BUILD_TESTS "Compilar las pruebas del motor" ON)
 
