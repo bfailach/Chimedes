@@ -10,8 +10,10 @@ Fase 1 (versión mínima) en curso:
 
 - [x] Esqueleto del proyecto: CMake, JUCE y ventana con la regla de tiempo
 - [x] Modelo y motor: validación de conexidad, árboles (BFS, DFS, Dijkstra, Prim), recorridos y horarios en ambos modos, con pruebas
-- [ ] Audio: transporte, sintetizador y publicación de horarios entre hilos
+- [x] Audio: transporte con BPM, sintetizador básico y publicación de horarios entre hilos
 - [ ] Lienzo: crear, mover y conectar nodos, y marcar inicio y fin
+
+Mientras llega el editor, la aplicación reproduce un grafo de demostración. Desde la barra superior se puede cambiar el modo, el método de árbol, el recorrido, el modo de hermanos y si el grafo es dirigido. La barra espaciadora alterna reproducir y pausa.
 
 ## Compilar
 
@@ -46,14 +48,26 @@ cmake --build build-tests
 ./build-tests/chimedes_tests
 ```
 
+## Renderizar sin tarjeta de sonido
+
+`ChimedesRender` se compila junto con la aplicación y renderiza el grafo de demostración a WAV con el mismo motor de audio:
+
+```sh
+./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2
+```
+
+Modos: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. El último argumento es el número de ciclos. La herramienta muestra los tiempos esperados de cada nota junto a los ataques que detecta en el audio.
+
 ## Estructura
 
 ```text
 Source/
 ├── model/    Proyecto, pistas, nodos y aristas (C++ puro)
-├── engine/   Validación, árboles, recorridos y horarios (C++ puro)
+├── engine/   Validación, árboles, recorridos, horarios y secuenciador (C++ puro)
+├── audio/    Motor de audio y sintetizador (JUCE)
 ├── ui/       Interfaz con JUCE
 └── Main.cpp  Punto de entrada de la aplicación
+Tools/        Herramientas de desarrollo (ChimedesRender)
 Tests/        Pruebas del motor
 JUCE/         Submódulo de Git (JUCE 9.0.4)
 ```
