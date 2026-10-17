@@ -24,6 +24,8 @@ struct Node
     double durationBeats = 1.0;
     int velocity = 100;             // 1..127
     InstrumentId instrument = 0;    // 0 = el de la pista (fase 3)
+
+    bool operator== (const Node&) const = default;
 };
 
 struct Edge
@@ -31,6 +33,8 @@ struct Edge
     EdgeId id = 0;
     NodeId from = noNode;
     NodeId to = noNode;             // en grafos no dirigidos el orden no importa
+
+    bool operator== (const Edge&) const = default;
 };
 
 enum class PlaybackMode { Timeline, Algorithm };
@@ -55,6 +59,10 @@ struct Track
     Traversal traversal = Traversal::BFS;
     SiblingMode siblings = SiblingMode::Sequential;
 
+    // Ajuste opcional al pulso en el modo algoritmo: cada espera se redondea a un
+    // múltiplo de esta subdivisión (en pulsos). 0 = sin ajuste, esperas libres.
+    double quantizeBeats = 0.0;
+
     InstrumentId instrument = 0;
     bool muted = false;
 
@@ -63,6 +71,8 @@ struct Track
 
     // Longitud euclidiana de una arista en píxeles; 0 si algún extremo no existe.
     double edgeLength (const Edge& edge) const noexcept;
+
+    bool operator== (const Track&) const = default;
 };
 
 struct Project

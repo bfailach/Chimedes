@@ -6,14 +6,35 @@ Escrito en C++20 con [JUCE](https://juce.com) 9.
 
 ## Estado
 
-Fase 1 (versión mínima) en curso:
+Fase 1 (versión mínima) completa:
 
 - [x] Esqueleto del proyecto: CMake, JUCE y ventana con la regla de tiempo
 - [x] Modelo y motor: validación de conexidad, árboles (BFS, DFS, Dijkstra, Prim), recorridos y horarios en ambos modos, con pruebas
 - [x] Audio: transporte con BPM, sintetizador básico y publicación de horarios entre hilos
-- [ ] Lienzo: crear, mover y conectar nodos, y marcar inicio y fin
+- [x] Lienzo editable, panel de propiedades, deshacer y rehacer
+- [x] Ajuste opcional al pulso en el modo algoritmo
 
-Mientras llega el editor, la aplicación reproduce un grafo de demostración. Desde la barra superior se puede cambiar el modo, el método de árbol, el recorrido, el modo de hermanos y si el grafo es dirigido. La barra espaciadora alterna reproducir y pausa.
+Siguiente: fase 2 (guardar y abrir proyectos) y lo que queda del modo algoritmo.
+
+## Uso
+
+La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
+
+| Acción | Cómo |
+| --- | --- |
+| Crear nodo | Doble clic en un espacio vacío (hereda las notas del último nodo seleccionado) |
+| Mover nodo | Arrastrar desde su centro |
+| Conectar | Arrastrar desde el borde de un nodo hasta otro |
+| Seleccionar | Clic en un nodo o una arista |
+| Borrar | Supr o Retroceso, con algo seleccionado |
+| Inicio y fin | Clic derecho en un nodo, o los botones del panel derecho |
+| Notas del nodo | Panel derecho: `C4`, `F#3`, `Bb2`, o un acorde `C4 E4 G4` |
+| Zoom | Rueda del ratón |
+| Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
+| Reproducir / pausa | Barra espaciadora |
+| Deshacer / rehacer | Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
+
+Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
 
 ## Compilar
 

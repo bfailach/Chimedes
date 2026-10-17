@@ -18,6 +18,8 @@ option(CHIMEDES_BUILD_TESTS "Compilar las pruebas del motor" ON)
 # ---------------------------------------------------------------------------
 add_library(chimedes_core STATIC
     Source/model/Track.cpp
+    Source/model/TrackEditing.cpp
+    Source/model/NoteNames.cpp
     Source/engine/Adjacency.cpp
     Source/engine/Validator.cpp
     Source/engine/TreeBuilder.cpp
@@ -43,6 +45,7 @@ if(CHIMEDES_BUILD_TESTS)
         Tests/TreeBuilderTests.cpp
         Tests/SchedulerTests.cpp
         Tests/SequencerTests.cpp
+        Tests/EditingTests.cpp
     )
     target_link_libraries(chimedes_tests PRIVATE chimedes_core)
     target_include_directories(chimedes_tests PRIVATE Tests)
@@ -65,6 +68,7 @@ if(CHIMEDES_BUILD_APP)
         Source/Main.cpp
         Source/audio/AudioEngine.cpp
         Source/ui/GraphView.cpp
+        Source/ui/Inspector.cpp
         Source/ui/MainComponent.cpp
     )
 

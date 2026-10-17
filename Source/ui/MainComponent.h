@@ -9,15 +9,17 @@
 #include "engine/Schedule.h"
 #include "model/Track.h"
 #include "ui/GraphView.h"
+#include "ui/Inspector.h"
 
 namespace chimedes::ui
 {
 
-// Ventana principal: barra de transporte arriba y el grafo debajo.
-// Mientras no exista el editor, reproduce un grafo de demostración y deja
-// cambiar el modo, el método de árbol, el recorrido y el modo de hermanos.
+// Ventana principal: transporte arriba, lienzo en el centro y propiedades a la
+// derecha. Es la dueña de la pista: aplica cada cambio, lo registra para deshacer,
+// recalcula el horario y lo publica al audio.
 class MainComponent : public juce::Component,
-                      private juce::Timer
+                      private juce::Timer,
+                      private juce::ChangeListener
 {
 public:
     MainComponent();
@@ -28,12 +30,22 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
 
 private:
-    void timerCallback() override;
+    class TrackChange;
 
-    // Lee los controles, recalcula el horario y lo publica al audio.
+    void timerCallback() override;
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;  // el historial cambió
+
+    // Cambios a la pista
+    void applyEdit (const EditCallbacks::Change& change);
+    void beginGesture();
+    void updateGesture (const EditCallbacks::Change& change);
+    void endGesture();
+    void setTrack (const model::Track& newTrack);  // usado por deshacer y rehacer
+    void trackChanged();
+
     void rebuildSchedule();
-    void updateControlsEnabled();
     void togglePlayPause();
+    void updateUndoButtons();
 
     // Audio
     audio::AudioEngine engine;
@@ -43,6 +55,8 @@ private:
     // Datos
     model::Track track;
     std::shared_ptr<const engine::Schedule> schedule;
+    juce::UndoManager undoManager;
+    std::optional<model::Track> gestureStart;
 
     // Interfaz
     juce::TextButton playButton { "Reproducir" };
@@ -50,10 +64,12 @@ private:
     juce::TextButton stopButton { "Detener" };
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
-    juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox;
-    juce::ToggleButton directedToggle { "Dirigido" };
+    juce::TextButton newButton { "Nuevo" };
+    juce::TextButton undoButton { "Deshacer" };
+    juce::TextButton redoButton { "Rehacer" };
     juce::Label statusLabel;
     GraphView graphView;
+    Inspector inspector;
 
     juce::String audioWarning;
     int timerTicks = 0;

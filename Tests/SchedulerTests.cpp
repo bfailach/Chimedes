@@ -204,3 +204,61 @@ TEST ("horario: los eventos salen ordenados por tiempo")
     for (std::size_t i = 1; i < events.size(); ++i)
         CHECK (events[i - 1].startBeat <= events[i].startBeat);
 }
+
+// ---------------------------------------------------------------------------
+// Ajuste opcional al pulso
+// ---------------------------------------------------------------------------
+
+#include "model/DemoProject.h"
+
+TEST ("ajuste al pulso: cada espera se redondea a la subdivisión")
+{
+    auto t = model::makeDemoTrack();
+    t.mode = model::PlaybackMode::Algorithm;
+    t.treeMethod = model::TreeMethod::BFS;
+    t.traversal = model::Traversal::BFS;
+    t.siblings = model::SiblingMode::Sequential;
+    t.quantizeBeats = 0.5;
+
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+    const auto& s = *result.schedule;
+
+    // Esperas libres: 1,41 · 1,92 · 1,55 · 1,80 · 2,09 · 1,72 · 1,80
+    // Ajustadas a 1/2:  1,5  · 2,0  · 1,5  · 2,0  · 2,0  · 1,5  · 2,0
+    CHECK_NEAR (eventOf (s, 1)->startBeat, 0.0);
+    CHECK_NEAR (eventOf (s, 2)->startBeat, 1.5);
+    CHECK_NEAR (eventOf (s, 3)->startBeat, 3.5);
+    CHECK_NEAR (eventOf (s, 4)->startBeat, 5.0);
+    CHECK_NEAR (eventOf (s, 5)->startBeat, 7.0);
+    CHECK_NEAR (eventOf (s, 7)->startBeat, 9.0);
+    CHECK_NEAR (eventOf (s, 6)->startBeat, 10.5);
+    CHECK_NEAR (eventOf (s, 8)->startBeat, 12.5);
+    CHECK_NEAR (s.cycleLengthBeats, 14.5);
+}
+
+TEST ("ajuste al pulso: una arista muy corta espera al menos una subdivisión")
+{
+    model::Track t;
+    t.mode = model::PlaybackMode::Algorithm;
+    t.nodes = { node (1, 0, 0), node (2, 10, 0) };  // 10 px = 0,1 pulsos
+    t.edges = { edge (1, 2) };
+    t.startNode = 1;
+    t.endNode = 2;
+    t.quantizeBeats = 0.25;
+
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+    CHECK_NEAR (eventOf (*result.schedule, 2)->startBeat, 0.25);
+}
+
+TEST ("ajuste al pulso: sin ajuste las esperas son libres")
+{
+    auto t = model::makeDemoTrack();
+    t.mode = model::PlaybackMode::Algorithm;
+    t.quantizeBeats = 0.0;
+
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+    CHECK (std::abs (eventOf (*result.schedule, 2)->startBeat - 1.41421356) < 1e-6);
+}
