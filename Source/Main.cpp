@@ -1,6 +1,8 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include "ui/ChimedesLookAndFeel.h"
 #include "ui/MainComponent.h"
+#include "ui/Theme.h"
 
 class ChimedesApplication : public juce::JUCEApplication
 {
@@ -11,12 +13,15 @@ public:
 
     void initialise (const juce::String&) override
     {
+        // El tema se aplica a toda la app, también a menús y ventanas emergentes.
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         mainWindow = std::make_unique<MainWindow> (getApplicationName());
     }
 
     void shutdown() override
     {
         mainWindow = nullptr;
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
 
     void systemRequestedQuit() override
@@ -29,10 +34,7 @@ private:
     {
     public:
         explicit MainWindow (const juce::String& name)
-            : DocumentWindow (name,
-                              juce::Desktop::getInstance().getDefaultLookAndFeel()
-                                  .findColour (juce::ResizableWindow::backgroundColourId),
-                              DocumentWindow::allButtons)
+            : DocumentWindow (name, chimedes::ui::theme::background, DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
             setContentOwned (new chimedes::ui::MainComponent(), true);
@@ -50,6 +52,7 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };
 
+    chimedes::ui::ChimedesLookAndFeel lookAndFeel;  // debe vivir más que la ventana
     std::unique_ptr<MainWindow> mainWindow;
 };
 

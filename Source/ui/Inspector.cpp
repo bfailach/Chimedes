@@ -6,17 +6,13 @@
 #include "model/NoteNames.h"
 #include "model/TrackEditing.h"
 #include "ui/Text.h"
+#include "ui/Theme.h"
 
 namespace chimedes::ui
 {
 
 namespace
 {
-    const juce::Colour panelColour  { 0xff1b1d23 };
-    const juce::Colour headerColour { 0xffd0d4dc };
-    const juce::Colour quietColour  { 0xff8a909c };
-    const juce::Colour errorColour  { 0xffe06c75 };
-
     // Subdivisiones del ajuste al pulso, en el orden del desplegable.
     constexpr std::array<double, 4> quantizeSteps { 0.0, 1.0, 0.5, 0.25 };
 
@@ -31,14 +27,14 @@ namespace
     void styleHeader (juce::Label& label, const char* name)
     {
         label.setText (text (name), juce::dontSendNotification);
-        label.setFont (juce::FontOptions (15.0f, juce::Font::bold));
-        label.setColour (juce::Label::textColourId, headerColour);
+        label.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        label.setColour (juce::Label::textColourId, theme::textPrimary);
     }
 
     void styleCaption (juce::Label& label, const char* name)
     {
         label.setText (text (name), juce::dontSendNotification);
-        label.setColour (juce::Label::textColourId, quietColour);
+        label.setColour (juce::Label::textColourId, theme::textSecondary);
     }
 }
 
@@ -165,8 +161,8 @@ void Inspector::applyNotes()
 
     if (! pitches.has_value())
     {
-        notesEditor.setColour (juce::TextEditor::outlineColourId, errorColour);
-        notesEditor.setColour (juce::TextEditor::focusedOutlineColourId, errorColour);
+        notesEditor.setColour (juce::TextEditor::outlineColourId, theme::error);
+        notesEditor.setColour (juce::TextEditor::focusedOutlineColourId, theme::error);
         notesEditor.repaint();
         return;
     }
@@ -237,42 +233,49 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
 
 void Inspector::paint (juce::Graphics& g)
 {
-    g.fillAll (panelColour);
-    g.setColour (juce::Colour (0xff2a2e37));
-    g.drawVerticalLine (0, 0.0f, static_cast<float> (getHeight()));
+    g.setColour (theme::panel);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), theme::cornerRadius);
+}
+
+int Inspector::getIdealHeight() const
+{
+    // Debe coincidir con resized(): márgenes + filas + separaciones.
+    return 12 + (24 + 6) + 5 * (30 + 6) + (24 + 18)
+         + (24 + 6) + (18 + 2) + (30 + 2) + (16 + 10) + (18 + 2) + (24 + 10)
+         + (18 + 2) + (24 + 16) + 3 * (30 + 6) + 6;
 }
 
 void Inspector::resized()
 {
     auto area = getLocalBounds().reduced (14, 12);
 
-    const auto row = [&area] (juce::Component& c, int height, int gapAfter = 8)
+    const auto row = [&area] (juce::Component& c, int height, int gapAfter = 6)
     {
         c.setBounds (area.removeFromTop (height));
         area.removeFromTop (gapAfter);
     };
 
-    row (trackHeader, 24, 6);
-    row (modeBox, 26);
-    row (treeBox, 26);
-    row (traversalBox, 26);
-    row (siblingsBox, 26);
-    row (quantizeBox, 26);
-    row (directedToggle, 24, 20);
+    row (trackHeader, 24);
+    row (modeBox, 30);
+    row (treeBox, 30);
+    row (traversalBox, 30);
+    row (siblingsBox, 30);
+    row (quantizeBox, 30);
+    row (directedToggle, 24, 18);
 
-    row (nodeHeader, 24, 6);
+    row (nodeHeader, 24);
     noSelectionLabel.setBounds (area.withHeight (24));
 
     row (notesLabel, 18, 2);
-    row (notesEditor, 26, 2);
+    row (notesEditor, 30, 2);
     row (notesHint, 16, 10);
     row (durationLabel, 18, 2);
     row (durationSlider, 24, 10);
     row (velocityLabel, 18, 2);
     row (velocitySlider, 24, 16);
-    row (startButton, 26, 6);
-    row (endButton, 26, 6);
-    row (deleteButton, 26);
+    row (startButton, 30);
+    row (endButton, 30);
+    row (deleteButton, 30);
 }
 
 } // namespace chimedes::ui

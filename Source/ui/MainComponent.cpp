@@ -5,17 +5,16 @@
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
 #include "ui/Text.h"
+#include "ui/Theme.h"
 
 namespace chimedes::ui
 {
 
 namespace
 {
-    constexpr int toolbarHeight = 48;
+    constexpr int margin = 24;          // separación de los paneles flotantes al borde
     constexpr int inspectorWidth = 270;
-
-    const juce::Colour toolbarColour { 0xff1b1d23 };
-    const juce::Colour errorColour { 0xffe0a84f };
+    constexpr int barHeight = 52;
 
     juce::String describe (const engine::ScheduleResult& result)
     {
@@ -66,10 +65,11 @@ MainComponent::MainComponent()
     pauseButton.onClick = [this] { engine.pause(); };
     stopButton.onClick = [this] { engine.stop(); };
 
-    bpmLabel.setJustificationType (juce::Justification::centredRight);
+    bpmLabel.setJustificationType (juce::Justification::centred);
+    bpmLabel.setColour (juce::Label::textColourId, theme::textSecondary);
     bpmSlider.setRange (40.0, 240.0, 1.0);
     bpmSlider.setValue (engine.getBpm(), juce::dontSendNotification);
-    bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 44, 22);
+    bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 44, 24);
     bpmSlider.onValueChange = [this] { engine.setBpm (bpmSlider.getValue()); };
 
     newButton.onClick = [this]
@@ -86,7 +86,8 @@ MainComponent::MainComponent()
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
 
-    statusLabel.setColour (juce::Label::textColourId, errorColour);
+    statusLabel.setColour (juce::Label::textColourId, theme::warning);
+    statusLabel.setFont (juce::FontOptions (13.0f));
 
     // --- Edición -----------------------------------------------------------
     const EditCallbacks editCallbacks {
@@ -101,10 +102,15 @@ MainComponent::MainComponent()
     graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (track, node); };
     graphView.setTrack (&track);
 
+    // El lienzo ocupa toda la ventana; los paneles flotan encima.
+    addAndMakeVisible (graphView);
+    addAndMakeVisible (inspector);
+    addAndMakeVisible (bottomBar);
+
     for (auto* c : std::initializer_list<juce::Component*> {
-             &playButton, &pauseButton, &stopButton, &bpmLabel, &bpmSlider, &newButton,
-             &undoButton, &redoButton, &statusLabel, &graphView, &inspector })
-        addAndMakeVisible (c);
+             &bpmLabel, &bpmSlider, &statusLabel, &stopButton, &playButton, &pauseButton,
+             &newButton, &undoButton, &redoButton })
+        bottomBar.addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
     const auto audioError = deviceManager.initialiseWithDefaultDevices (0, 2);
@@ -282,36 +288,44 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.setColour (toolbarColour);
-    g.fillRect (getLocalBounds().removeFromTop (toolbarHeight));
+    g.fillAll (theme::background);
 }
 
 void MainComponent::resized()
 {
     auto area = getLocalBounds();
-    auto bar = area.removeFromTop (toolbarHeight).reduced (8, 10);
-
-    const auto place = [&bar] (juce::Component& c, int width)
-    {
-        c.setBounds (bar.removeFromLeft (width));
-        bar.removeFromLeft (6);
-    };
-
-    place (playButton, 92);
-    place (pauseButton, 64);
-    place (stopButton, 70);
-    bar.removeFromLeft (10);
-    place (bpmLabel, 36);
-    place (bpmSlider, 160);
-    bar.removeFromLeft (16);
-    place (newButton, 64);
-    place (undoButton, 80);
-    place (redoButton, 72);
-    bar.removeFromLeft (10);
-    statusLabel.setBounds (bar);
-
-    inspector.setBounds (area.removeFromRight (inspectorWidth));
     graphView.setBounds (area);
+
+    area.reduce (margin, margin);
+
+    // Barra inferior: BPM y estado a la izquierda, transporte al centro, acciones a la derecha.
+    bottomBar.setBounds (area.removeFromBottom (barHeight));
+    {
+        auto bar = bottomBar.getLocalBounds().reduced (10, 10);
+
+        auto transport = bar.withSizeKeepingCentre (3 * 44, bar.getHeight());
+        stopButton.setBounds (transport.removeFromLeft (44));
+        playButton.setBounds (transport.removeFromLeft (44));
+        pauseButton.setBounds (transport.removeFromLeft (44));
+
+        auto right = bar.removeFromRight (bar.getWidth() / 2 - 3 * 22 - 12);
+        redoButton.setBounds (right.removeFromRight (84));
+        right.removeFromRight (6);
+        undoButton.setBounds (right.removeFromRight (90));
+        right.removeFromRight (6);
+        newButton.setBounds (right.removeFromRight (72));
+
+        auto left = bar.removeFromLeft (bar.getWidth() - 3 * 44 - 12);
+        bpmLabel.setBounds (left.removeFromLeft (38));
+        bpmSlider.setBounds (left.removeFromLeft (170));
+        left.removeFromLeft (16);
+        statusLabel.setBounds (left);
+    }
+
+    // Panel derecho flotante, alineado arriba, sin pisar la barra.
+    area.removeFromBottom (16);
+    const auto panelHeight = std::min (inspector.getIdealHeight(), area.getHeight());
+    inspector.setBounds (area.removeFromRight (inspectorWidth).removeFromTop (panelHeight));
 }
 
 } // namespace chimedes::ui

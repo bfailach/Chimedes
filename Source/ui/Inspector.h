@@ -21,6 +21,9 @@ public:
     // Vuelve a mostrar la pista y el nodo seleccionado (noNode = ninguno).
     void refresh (const model::Track& track, model::NodeId selectedNode);
 
+    // Alto que necesita para mostrar todo su contenido.
+    int getIdealHeight() const;
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
