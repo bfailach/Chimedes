@@ -15,14 +15,14 @@ namespace
 
     engine::NoteEvent note (double start, double duration, int pitch)
     {
-        return { start, duration, { pitch }, 100, 0 };
+        return { start, duration, { pitch }, 100, 0, 1 };
     }
 
     // Reproduce de `from` a `to` en bloques de `block` pulsos y devuelve los mensajes.
     std::vector<Message> play (engine::Sequencer& seq, double from, double to, double block)
     {
         std::vector<Message> out;
-        const auto sink = [&out] (double beat, int pitch, int, bool on) { out.push_back ({ beat, pitch, on }); };
+        const auto sink = [&out] (double beat, int pitch, int, int, bool on) { out.push_back ({ beat, pitch, on }); };
 
         for (auto b = from; b < to; b += block)
             seq.process (b, std::min (b + block, to), sink);
@@ -131,7 +131,7 @@ TEST ("secuenciador: al cambiar de horario sigue desde la posición del ciclo")
         seq.setSchedule (&schedule);
         std::vector<Message> out;
         // Empieza en el pulso 5: ya pasó el do del segundo ciclo (pulso 4).
-        seq.process (5.0, 7.0, [&out] (double beat, int pitch, int, bool on) { out.push_back ({ beat, pitch, on }); });
+        seq.process (5.0, 7.0, [&out] (double beat, int pitch, int, int, bool on) { out.push_back ({ beat, pitch, on }); });
         return out;
     }();
 
@@ -163,7 +163,7 @@ TEST ("secuenciador: una nota repetida se apaga antes de volver a sonar")
 TEST ("secuenciador: apagar todo deja cero notas activas")
 {
     engine::Schedule s;
-    s.events = { { 0.0, 4.0, { 60, 64, 67 }, 100, 0 } };  // un acorde largo
+    s.events = { { 0.0, 4.0, { 60, 64, 67 }, 100, 0, 1 } };  // un acorde largo
     s.cycleLengthBeats = 8.0;
 
     engine::Sequencer seq;
@@ -172,7 +172,7 @@ TEST ("secuenciador: apagar todo deja cero notas activas")
     CHECK (seq.getNumActiveNotes() == 3);
 
     int offs = 0;
-    seq.allNotesOff (1.0, [&offs] (double, int, int, bool on) { offs += on ? 0 : 1; });
+    seq.allNotesOff (1.0, [&offs] (double, int, int, int, bool on) { offs += on ? 0 : 1; });
     CHECK (offs == 3);
     CHECK (seq.getNumActiveNotes() == 0);
 }
@@ -186,4 +186,21 @@ TEST ("secuenciador: sin horario no emite nada")
     empty.cycleLengthBeats = 4.0;
     seq.setSchedule (&empty);
     CHECK (play (seq, 0.0, 10.0, 1.0).empty());
+}
+
+TEST ("secuenciador: la misma nota en dos instrumentos suena por separado")
+{
+    engine::Schedule s;
+    s.events = { { 0.0, 2.0, { 60 }, 100, 0, 1 }, { 0.0, 2.0, { 60 }, 100, 0, 5 } };
+    s.cycleLengthBeats = 4.0;
+
+    engine::Sequencer seq;
+    seq.setSchedule (&s);
+
+    int ons = 0, offs = 0;
+    seq.process (0.0, 1.0, [&] (double, int, int, int, bool on) { (on ? ons : offs)++; });
+
+    CHECK (ons == 2);
+    CHECK (offs == 0);  // no se cortan entre sí
+    CHECK (seq.getNumActiveNotes() == 2);
 }

@@ -76,6 +76,7 @@ private:
     TransportButton pauseButton { "Pausa", TransportButton::Icon::Pause };
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
+    juce::TextButton randomButton { "Aleatorio" };
     juce::TextButton newButton { "Nuevo" };
     juce::TextButton undoButton { "Deshacer" };
     juce::TextButton redoButton { "Rehacer" };

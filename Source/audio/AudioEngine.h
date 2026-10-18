@@ -25,7 +25,7 @@ class AudioEngine : public juce::AudioSource
 {
 public:
     static constexpr int maxTracks = 16;
-    static constexpr int voicesPerTrack = 16;
+    static constexpr int voicesPerTrack = 24;
 
     AudioEngine();
     ~AudioEngine() override;

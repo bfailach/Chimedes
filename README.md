@@ -13,6 +13,7 @@ Fase 1 (versión mínima) completa:
 - [x] Audio: transporte con BPM, sintetizador básico y publicación de horarios entre hilos
 - [x] Lienzo editable, panel de propiedades, deshacer y rehacer
 - [x] Ajuste opcional al pulso en el modo algoritmo
+- [x] Interfaz oscura con paneles flotantes, selector de notas con teclado, seis instrumentos integrados y botón Aleatorio
 
 Siguiente: fase 2 (guardar y abrir proyectos) y lo que queda del modo algoritmo.
 
@@ -28,13 +29,23 @@ La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
 | Seleccionar | Clic en un nodo o una arista |
 | Borrar | Supr o Retroceso, con algo seleccionado |
 | Inicio y fin | Clic derecho en un nodo, o los botones del panel derecho |
-| Notas del nodo | Panel derecho: `C4`, `F#3`, `Bb2`, o un acorde `C4 E4 G4` |
+| Notas del nodo | Teclado del panel derecho: clic elige una nota, Mayús+clic forma acordes; `<` `>` cambian de octava |
+| Instrumento | Panel derecho: uno para la pista y, si quieres, otro para cada nodo |
+| Grafo al azar | Botón **Aleatorio** (se puede deshacer) |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
 | Reproducir / pausa | Barra espaciadora |
 | Deshacer / rehacer | Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
 
 Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Colores de los nodos: anillo verde = inicio, violeta = fin, naranja = inalcanzable; el nodo que suena se ilumina. Los nombres de las notas aparecen al pasar el ratón o al seleccionar un nodo, y la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
+
+## Instrumentos
+
+Seis instrumentos sintetizados, sin archivos de audio: órgano, piano eléctrico (FM), campana (FM inarmónica), cuerda pulsada (Karplus-Strong), pad (dos sierras desafinadas y filtradas) y bajo. Cada instrumento suena por su propio canal MIDI, así que en una misma pista pueden convivir varios. Las muestras grabadas llegan en la fase 3.
+
+## Aleatorio
+
+Genera un grafo nuevo al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
 
 ## Compilar
 
@@ -74,10 +85,10 @@ cmake --build build-tests
 `ChimedesRender` se compila junto con la aplicación y renderiza el grafo de demostración a WAV con el mismo motor de audio:
 
 ```sh
-./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2
+./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2 3
 ```
 
-Modos: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. El último argumento es el número de ciclos. La herramienta muestra los tiempos esperados de cada nota junto a los ataques que detecta en el audio.
+Modos: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Después van el número de ciclos y, opcionalmente, el instrumento (1 órgano, 2 piano eléctrico, 3 campana, 4 cuerda pulsada, 5 pad, 6 bajo). La herramienta muestra los tiempos esperados de cada nota junto a los ataques que detecta en el audio.
 
 ## Estructura
 

@@ -3,6 +3,7 @@
 #include "ui/ChimedesLookAndFeel.h"
 #include "ui/MainComponent.h"
 #include "ui/Theme.h"
+#include "ui/WindowStyle.h"
 
 class ChimedesApplication : public juce::JUCEApplication
 {
@@ -41,6 +42,7 @@ private:
             setResizable (true, true);
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
+            chimedes::ui::applyDarkTitleBar (*this);  // tras setVisible: necesita la ventana nativa
         }
 
         void closeButtonPressed() override

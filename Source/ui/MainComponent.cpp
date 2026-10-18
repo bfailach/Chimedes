@@ -4,6 +4,7 @@
 
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
+#include "model/Randomizer.h"
 #include "ui/Text.h"
 #include "ui/Theme.h"
 
@@ -83,6 +84,18 @@ MainComponent::MainComponent()
             t.endNode = model::noNode;
         });
     };
+    randomButton.setTooltip (text ("Grafo nuevo al azar: cantidad de nodos, forma, separación y duración"));
+    randomButton.onClick = [this]
+    {
+        const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
+        graphView.selectNode (model::noNode);
+        applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); });
+
+        // Encuadra el grafo nuevo en la parte del lienzo que no tapan los paneles.
+        graphView.zoomToFit (getLocalBounds().reduced (margin)
+                                 .withTrimmedRight (inspectorWidth + 16)
+                                 .withTrimmedBottom (barHeight + 16));
+    };
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
 
@@ -109,7 +122,7 @@ MainComponent::MainComponent()
 
     for (auto* c : std::initializer_list<juce::Component*> {
              &bpmLabel, &bpmSlider, &statusLabel, &stopButton, &playButton, &pauseButton,
-             &newButton, &undoButton, &redoButton })
+             &randomButton, &newButton, &undoButton, &redoButton })
         bottomBar.addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
@@ -128,7 +141,7 @@ MainComponent::MainComponent()
     updateUndoButtons();
 
     setWantsKeyboardFocus (true);
-    setSize (1400, 800);
+    setSize (1440, 900);
     startTimerHz (30);
 }
 
@@ -314,6 +327,8 @@ void MainComponent::resized()
         undoButton.setBounds (right.removeFromRight (90));
         right.removeFromRight (6);
         newButton.setBounds (right.removeFromRight (72));
+        right.removeFromRight (6);
+        randomButton.setBounds (right.removeFromRight (92));
 
         auto left = bar.removeFromLeft (bar.getWidth() - 3 * 44 - 12);
         bpmLabel.setBounds (left.removeFromLeft (38));
@@ -322,10 +337,12 @@ void MainComponent::resized()
         statusLabel.setBounds (left);
     }
 
-    // Panel derecho flotante, alineado arriba, sin pisar la barra.
+    // Panel derecho flotante, centrado en vertical respecto a la ventana, sin pisar la barra.
     area.removeFromBottom (16);
     const auto panelHeight = std::min (inspector.getIdealHeight(), area.getHeight());
-    inspector.setBounds (area.removeFromRight (inspectorWidth).removeFromTop (panelHeight));
+    const auto centredTop = (getHeight() - panelHeight) / 2;
+    const auto top = juce::jlimit (area.getY(), area.getBottom() - panelHeight, centredTop);
+    inspector.setBounds (area.getRight() - inspectorWidth, top, inspectorWidth, panelHeight);
 }
 
 } // namespace chimedes::ui

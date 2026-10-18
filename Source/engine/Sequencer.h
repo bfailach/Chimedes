@@ -41,7 +41,7 @@ public:
     }
 
     // Emite los mensajes del tramo [fromBeat, toBeat). El receptor se llama como
-    // sink (double beat, int pitch, int velocity, bool isNoteOn).
+    // sink (double beat, int pitch, int velocity, int instrument, bool isNoteOn).
     template <typename Sink>
     void process (double fromBeat, double toBeat, Sink&& sink)
     {
@@ -54,7 +54,10 @@ public:
     void allNotesOff (double beat, Sink&& sink)
     {
         for (int i = 0; i < numActive; ++i)
-            sink (beat, active[static_cast<std::size_t> (i)].pitch, 0, false);
+        {
+            const auto& note = active[static_cast<std::size_t> (i)];
+            sink (beat, note.pitch, 0, note.instrument, false);
+        }
 
         numActive = 0;
     }
@@ -65,6 +68,7 @@ private:
     struct ActiveNote
     {
         int pitch = 0;
+        int instrument = 1;
         double endBeat = 0.0;
     };
 
@@ -97,7 +101,8 @@ private:
                 break;
 
             for (const auto pitch : event.pitches)
-                startNote (beat, pitch, event.velocity, beat + event.durationBeats, sink);
+                startNote (beat, pitch, event.velocity, static_cast<int> (event.instrument),
+                           beat + event.durationBeats, sink);
 
             ++nextEvent;
         }
@@ -128,7 +133,7 @@ private:
 
             if (note.endBeat < toBeat)
             {
-                sink (note.endBeat, note.pitch, 0, false);
+                sink (note.endBeat, note.pitch, 0, note.instrument, false);
                 removeAt (i);
             }
             else
@@ -139,15 +144,16 @@ private:
     }
 
     template <typename Sink>
-    void startNote (double beat, int pitch, int velocity, double endBeat, Sink& sink)
+    void startNote (double beat, int pitch, int velocity, int instrument, double endBeat, Sink& sink)
     {
-        // Si la misma nota ya suena, se apaga antes de volver a tocarla, para que su
-        // note-off pendiente no corte la nueva.
+        // Si la misma nota ya suena en el mismo instrumento, se apaga antes de volver a
+        // tocarla, para que su note-off pendiente no corte la nueva.
         for (int i = 0; i < numActive; ++i)
         {
-            if (active[static_cast<std::size_t> (i)].pitch == pitch)
+            const auto& note = active[static_cast<std::size_t> (i)];
+            if (note.pitch == pitch && note.instrument == instrument)
             {
-                sink (beat, pitch, 0, false);
+                sink (beat, pitch, 0, instrument, false);
                 removeAt (i);
                 break;
             }
@@ -161,12 +167,13 @@ private:
                 if (active[static_cast<std::size_t> (i)].endBeat < active[static_cast<std::size_t> (earliest)].endBeat)
                     earliest = i;
 
-            sink (beat, active[static_cast<std::size_t> (earliest)].pitch, 0, false);
+            const auto& oldest = active[static_cast<std::size_t> (earliest)];
+            sink (beat, oldest.pitch, 0, oldest.instrument, false);
             removeAt (earliest);
         }
 
-        sink (beat, pitch, velocity, true);
-        active[static_cast<std::size_t> (numActive++)] = { pitch, endBeat };
+        sink (beat, pitch, velocity, instrument, true);
+        active[static_cast<std::size_t> (numActive++)] = { pitch, instrument, endBeat };
     }
 
     void removeAt (int index) noexcept

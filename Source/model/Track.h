@@ -23,7 +23,7 @@ struct Node
     std::vector<int> pitches;       // notas MIDI; una = nota, varias = acorde
     double durationBeats = 1.0;
     int velocity = 100;             // 1..127
-    InstrumentId instrument = 0;    // 0 = el de la pista (fase 3)
+    InstrumentId instrument = 0;    // 0 = el de la pista
 
     bool operator== (const Node&) const = default;
 };
@@ -63,7 +63,7 @@ struct Track
     // múltiplo de esta subdivisión (en pulsos). 0 = sin ajuste, esperas libres.
     double quantizeBeats = 0.0;
 
-    InstrumentId instrument = 0;
+    InstrumentId instrument = 1;    // ver model/Instruments.h (1 = órgano)
     bool muted = false;
 
     // Devuelve el nodo con ese id, o nullptr si no existe.

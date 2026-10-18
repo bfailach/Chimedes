@@ -20,6 +20,7 @@ add_library(chimedes_core STATIC
     Source/model/Track.cpp
     Source/model/TrackEditing.cpp
     Source/model/NoteNames.cpp
+    Source/model/Randomizer.cpp
     Source/engine/Adjacency.cpp
     Source/engine/Validator.cpp
     Source/engine/TreeBuilder.cpp
@@ -46,6 +47,7 @@ if(CHIMEDES_BUILD_TESTS)
         Tests/SchedulerTests.cpp
         Tests/SequencerTests.cpp
         Tests/EditingTests.cpp
+        Tests/RandomizerTests.cpp
     )
     target_link_libraries(chimedes_tests PRIVATE chimedes_core)
     target_include_directories(chimedes_tests PRIVATE Tests)
@@ -71,6 +73,8 @@ if(CHIMEDES_BUILD_APP)
         Source/ui/GraphView.cpp
         Source/ui/Inspector.cpp
         Source/ui/MainComponent.cpp
+        Source/ui/PianoPicker.cpp
+        Source/ui/WindowStyle.cpp
     )
 
     target_compile_definitions(Chimedes PRIVATE
@@ -90,6 +94,11 @@ if(CHIMEDES_BUILD_APP)
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags
     )
+
+    # Barra de título oscura en Windows (DwmSetWindowAttribute).
+    if(WIN32)
+        target_link_libraries(Chimedes PRIVATE dwmapi)
+    endif()
 
     # Herramienta de desarrollo: renderiza el grafo de demostración a WAV sin tarjeta
     # de sonido, con el mismo motor de audio que la aplicación.

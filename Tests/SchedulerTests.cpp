@@ -262,3 +262,36 @@ TEST ("ajuste al pulso: sin ajuste las esperas son libres")
     REQUIRE (result.ok());
     CHECK (std::abs (eventOf (*result.schedule, 2)->startBeat - 1.41421356) < 1e-6);
 }
+
+// ---------------------------------------------------------------------------
+// Instrumentos
+// ---------------------------------------------------------------------------
+
+#include "model/Instruments.h"
+
+TEST ("instrumentos: cada nodo usa el suyo o, si no tiene, el de la pista")
+{
+    auto t = branching();
+    t.instrument = model::instruments::pad;
+
+    for (auto& n : t.nodes)
+        if (n.id == 3)
+            n.instrument = model::instruments::bell;
+
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+
+    CHECK (eventOf (*result.schedule, 1)->instrument == model::instruments::pad);
+    CHECK (eventOf (*result.schedule, 3)->instrument == model::instruments::bell);
+}
+
+TEST ("instrumentos: un id inválido vuelve al de la pista o al órgano")
+{
+    auto t = branching();
+    t.instrument = 99;
+    t.nodes[0].instrument = 42;
+
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+    CHECK (eventOf (*result.schedule, 1)->instrument == model::instruments::organ);
+}

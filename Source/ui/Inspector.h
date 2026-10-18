@@ -4,6 +4,7 @@
 
 #include "model/Track.h"
 #include "ui/EditCallbacks.h"
+#include "ui/PianoPicker.h"
 
 namespace chimedes::ui
 {
@@ -28,22 +29,21 @@ public:
     void resized() override;
 
 private:
-    void applyNotes();
-    void resetNotesColour();
+    int layout (bool apply);  // coloca los controles (si apply) y devuelve el alto total
     void editNode (const std::function<void (model::Node&)>& change);
     void connectSlider (juce::Slider& slider, std::function<void (model::Node&, double)> apply);
 
     model::NodeId node = model::noNode;
-    juce::String notesShown;
 
     // Pista
     juce::Label trackHeader;
-    juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox, quantizeBox;
+    juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox, quantizeBox, trackInstrumentBox;
     juce::ToggleButton directedToggle;
 
     // Nodo
-    juce::Label nodeHeader, notesLabel, notesHint, durationLabel, velocityLabel;
-    juce::TextEditor notesEditor;
+    juce::Label nodeHeader, notesLabel, notesValue, notesHint, instrumentLabel, durationLabel, velocityLabel;
+    PianoPicker piano;
+    juce::ComboBox nodeInstrumentBox;
     juce::Slider durationSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::Slider velocitySlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::TextButton startButton, endButton, deleteButton;
