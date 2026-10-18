@@ -15,6 +15,7 @@ struct NoteEvent
     std::vector<int> pitches;
     int velocity = 100;
     model::NodeId node = model::noNode;  // para iluminar el nodo que suena
+    model::InstrumentId instrument = 1;  // ya resuelto: el del nodo o el de la pista
 };
 
 // Horario inmutable de una pista: lo único que lee el hilo de audio.

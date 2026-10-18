@@ -38,6 +38,10 @@ public:
     EditCallbacks callbacks;
     std::function<void (model::NodeId)> onSelectionChanged;
 
+    // Ajusta zoom y desplazamiento para que todo el grafo quepa en `visibleArea`
+    // (en coordenadas de este componente), sin acercar más allá del 100 %.
+    void zoomToFit (juce::Rectangle<int> visibleArea);
+
     model::NodeId getSelectedNode() const noexcept;
     void selectNode (model::NodeId node);
     void deleteSelection();

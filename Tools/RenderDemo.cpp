@@ -2,7 +2,7 @@
 // de sonido, usando el mismo motor de audio que la aplicación. Sirve para comprobar
 // el audio en máquinas sin altavoces y es la base de la futura exportación a WAV.
 //
-// Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos]
+// Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6]
 
 #include <iostream>
 
@@ -18,7 +18,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos]\n";
+        std::cerr << "Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6]\n";
         return 1;
     }
 
@@ -27,6 +27,9 @@ int main (int argc, char* argv[])
     const int cycles = argc > 3 ? juce::String (argv[3]).getIntValue() : 2;
 
     auto track = model::makeDemoTrack();
+
+    if (argc > 4)
+        track.instrument = static_cast<model::InstrumentId> (juce::String (argv[4]).getIntValue());
 
     if (mode != "timeline")
     {

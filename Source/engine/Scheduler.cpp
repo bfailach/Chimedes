@@ -7,6 +7,7 @@
 
 #include "engine/Traversal.h"
 #include "engine/TreeBuilder.h"
+#include "model/Instruments.h"
 #include "model/Units.h"
 
 namespace chimedes::engine
@@ -16,9 +17,10 @@ using model::NodeId;
 
 namespace
 {
-    NoteEvent makeEvent (const model::Node& node, double startBeat)
+    NoteEvent makeEvent (const model::Track& track, const model::Node& node, double startBeat)
     {
-        return { startBeat, node.durationBeats, node.pitches, node.velocity, node.id };
+        return { startBeat, node.durationBeats, node.pitches, node.velocity, node.id,
+                 model::resolveInstrument (track, node) };
     }
 
     // Espera en pulsos correspondiente a una arista. Con ajuste al pulso, se redondea a
@@ -60,7 +62,7 @@ namespace
 
         for (const auto& node : track.nodes)
             if (node.x >= start.x && node.x <= end.x)
-                schedule.events.push_back (makeEvent (node, model::pixelsToBeats (node.x - start.x)));
+                schedule.events.push_back (makeEvent (track, node, model::pixelsToBeats (node.x - start.x)));
 
         schedule.cycleLengthBeats = model::pixelsToBeats (end.x - start.x) + end.durationBeats;
         sortEvents (schedule);
@@ -83,7 +85,7 @@ namespace
                 time += waitBeats (tree.parentEdgeLength.at (id), track.quantizeBeats);
 
             const auto& node = *track.findNode (id);
-            schedule.events.push_back (makeEvent (node, time));
+            schedule.events.push_back (makeEvent (track, node, time));
 
             if (id == track.endNode)
             {
@@ -136,7 +138,7 @@ namespace
             {
                 played.insert (member);
                 const auto& node = *track.findNode (member);
-                schedule.events.push_back (makeEvent (node, time));
+                schedule.events.push_back (makeEvent (track, node, time));
 
                 if (member == track.endNode)
                 {

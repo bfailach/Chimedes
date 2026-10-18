@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "audio/BasicSynth.h"
+#include "audio/InstrumentSynth.h"
 
 namespace chimedes::audio
 {
@@ -10,7 +10,7 @@ namespace chimedes::audio
 namespace
 {
     // Receptor que descarta mensajes (al apagar notas, el sintetizador ya se encarga).
-    constexpr auto ignoreMessages = [] (double, int, int, bool) {};
+    constexpr auto ignoreMessages = [] (double, int, int, int, bool) {};
 }
 
 AudioEngine::AudioEngine()
@@ -18,10 +18,13 @@ AudioEngine::AudioEngine()
     for (auto& slot : slots)
     {
         slot = std::make_unique<TrackSlot>();
-        slot->synth.addSound (new BasicSound());
+
+        // Un sonido por instrumento, cada uno en su canal MIDI.
+        for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+            slot->synth.addSound (new InstrumentSound (id));
 
         for (int i = 0; i < voicesPerTrack; ++i)
-            slot->synth.addVoice (new BasicVoice());
+            slot->synth.addVoice (new InstrumentVoice());
     }
 }
 
@@ -109,13 +112,14 @@ void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer
 
     const auto toBeat = fromBeat + numSamples * beatsPerSample;
 
-    slot.sequencer.process (fromBeat, toBeat, [&] (double beat, int pitch, int velocity, bool isNoteOn)
+    slot.sequencer.process (fromBeat, toBeat, [&] (double beat, int pitch, int velocity, int instrument, bool isNoteOn)
     {
         const auto offset = std::clamp (static_cast<int> ((beat - fromBeat) / beatsPerSample), 0, numSamples - 1);
+        const auto channel = std::clamp (instrument, 1, 16);  // el canal MIDI elige el instrumento
 
         const auto message = isNoteOn
-            ? juce::MidiMessage::noteOn (1, pitch, static_cast<juce::uint8> (std::clamp (velocity, 1, 127)))
-            : juce::MidiMessage::noteOff (1, pitch);
+            ? juce::MidiMessage::noteOn (channel, pitch, static_cast<juce::uint8> (std::clamp (velocity, 1, 127)))
+            : juce::MidiMessage::noteOff (channel, pitch);
 
         slot.midi.addEvent (message, startSample + offset);
     });

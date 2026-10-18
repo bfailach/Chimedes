@@ -97,6 +97,36 @@ void GraphView::setSelection (model::NodeId node, model::EdgeId edgeId)
     repaint();
 }
 
+void GraphView::zoomToFit (juce::Rectangle<int> visibleArea)
+{
+    if (track == nullptr || track->nodes.empty() || visibleArea.isEmpty())
+        return;
+
+    auto minX = track->nodes.front().x, maxX = minX;
+    auto minY = track->nodes.front().y, maxY = minY;
+
+    for (const auto& n : track->nodes)
+    {
+        minX = std::min (minX, n.x);  maxX = std::max (maxX, n.x);
+        minY = std::min (minY, n.y);  maxY = std::max (maxY, n.y);
+    }
+
+    // Margen para los círculos y las etiquetas de inicio, fin y notas.
+    constexpr double margin = 70.0;
+    const auto width = (maxX - minX) + 2.0 * margin;
+    const auto height = (maxY - minY) + 2.0 * margin;
+
+    const auto area = visibleArea.withTrimmedTop (rulerHeight).toDouble();
+    zoom = static_cast<float> (std::clamp (std::min (area.getWidth() / width, area.getHeight() / height),
+                                           static_cast<double> (minZoom), 1.0));
+
+    const auto centreX = (minX + maxX) * 0.5;
+    const auto centreY = (minY + maxY) * 0.5;
+    viewOrigin = { centreX - area.getCentreX() / zoom,
+                   centreY - (area.getCentreY() - rulerHeight) / zoom };
+    repaint();
+}
+
 void GraphView::deleteSelection()
 {
     if (track == nullptr || ! callbacks.edit)
@@ -421,8 +451,10 @@ void GraphView::paintRuler (juce::Graphics& g) const
 
         if (beat % labelEvery == 0)
         {
+            // El número queda centrado sobre su línea.
             g.setColour (colours::textDisabled);
-            g.drawText (juce::String (beat), juce::roundToInt (x) + 4, 0, 40, rulerHeight - 4, juce::Justification::centredLeft);
+            g.drawText (juce::String (beat), juce::Rectangle<float> (40.0f, static_cast<float> (rulerHeight) - 8.0f).withCentre ({ x, (static_cast<float> (rulerHeight) - 6.0f) * 0.5f }),
+                        juce::Justification::centred);
         }
     }
 }
