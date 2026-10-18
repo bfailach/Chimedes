@@ -67,6 +67,7 @@ if(CHIMEDES_BUILD_APP)
     target_sources(Chimedes PRIVATE
         Source/Main.cpp
         Source/audio/AudioEngine.cpp
+        Source/ui/ChimedesLookAndFeel.cpp
         Source/ui/GraphView.cpp
         Source/ui/Inspector.cpp
         Source/ui/MainComponent.cpp

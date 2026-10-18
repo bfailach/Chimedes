@@ -26,7 +26,7 @@ class GraphView : public juce::Component
 {
 public:
     static constexpr int rulerHeight = 28;
-    static constexpr float nodeRadius = 18.0f;
+    static constexpr float nodeRadius = 20.0f;
 
     GraphView();
 
@@ -45,6 +45,7 @@ public:
     // juce::Component
     void paint (juce::Graphics& g) override;
     void mouseMove (const juce::MouseEvent& e) override;
+    void mouseExit (const juce::MouseEvent& e) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
@@ -84,7 +85,7 @@ private:
     double playheadBeat = 0.0;
     bool playing = false;
 
-    juce::Point<double> viewOrigin { -40.0, -40.0 };
+    juce::Point<double> viewOrigin { -80.0, -60.0 };
     float zoom = 1.0f;
 
     model::NodeId selectedNode = model::noNode;
@@ -100,6 +101,7 @@ private:
     juce::Point<double> panStartOrigin;
     juce::Point<float> mousePosition;
     model::NodeId hoverTarget = model::noNode;
+    model::NodeId hoverNode = model::noNode;   // bajo el ratón: muestra sus notas
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GraphView)
 };

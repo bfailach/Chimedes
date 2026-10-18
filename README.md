@@ -18,7 +18,7 @@ Siguiente: fase 2 (guardar y abrir proyectos) y lo que queda del modo algoritmo.
 
 ## Uso
 
-La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
+La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío. El lienzo ocupa toda la ventana, con el panel de propiedades flotando a la derecha y el transporte en la barra inferior.
 
 | Acción | Cómo |
 | --- | --- |
@@ -34,7 +34,7 @@ La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
 | Reproducir / pausa | Barra espaciadora |
 | Deshacer / rehacer | Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
 
-Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
+Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Colores de los nodos: anillo verde = inicio, violeta = fin, naranja = inalcanzable; el nodo que suena se ilumina. Los nombres de las notas aparecen al pasar el ratón o al seleccionar un nodo, y la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
 
 ## Compilar
 

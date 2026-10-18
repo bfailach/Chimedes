@@ -10,6 +10,7 @@
 #include "model/Track.h"
 #include "ui/GraphView.h"
 #include "ui/Inspector.h"
+#include "ui/TransportButton.h"
 
 namespace chimedes::ui
 {
@@ -58,10 +59,21 @@ private:
     juce::UndoManager undoManager;
     std::optional<model::Track> gestureStart;
 
+    // Fondo redondeado de la barra inferior flotante.
+    struct FloatingPanel : public juce::Component
+    {
+        void paint (juce::Graphics& g) override
+        {
+            g.setColour (theme::panel);
+            g.fillRoundedRectangle (getLocalBounds().toFloat(), theme::cornerRadius);
+        }
+    };
+
     // Interfaz
-    juce::TextButton playButton { "Reproducir" };
-    juce::TextButton pauseButton { "Pausa" };
-    juce::TextButton stopButton { "Detener" };
+    FloatingPanel bottomBar;
+    TransportButton stopButton { "Detener", TransportButton::Icon::Stop };
+    TransportButton playButton { "Reproducir", TransportButton::Icon::Play };
+    TransportButton pauseButton { "Pausa", TransportButton::Icon::Pause };
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
     juce::TextButton newButton { "Nuevo" };
@@ -70,6 +82,7 @@ private:
     juce::Label statusLabel;
     GraphView graphView;
     Inspector inspector;
+    juce::TooltipWindow tooltips { this, 600 };
 
     juce::String audioWarning;
     int timerTicks = 0;

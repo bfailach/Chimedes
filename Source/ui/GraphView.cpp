@@ -7,26 +7,12 @@
 #include "model/TrackEditing.h"
 #include "model/Units.h"
 #include "ui/Text.h"
+#include "ui/Theme.h"
 
 namespace chimedes::ui
 {
 
-namespace colours
-{
-    const juce::Colour background   { 0xff15171c };
-    const juce::Colour ruler        { 0xff1e2128 };
-    const juce::Colour gridLine     { 0xff23262e };
-    const juce::Colour quietText    { 0xff8a909c };
-    const juce::Colour edge         { 0xff5a6070 };
-    const juce::Colour node         { 0xff2b3040 };
-    const juce::Colour nodeBorder   { 0xff6b7385 };
-    const juce::Colour sounding     { 0xff4fa3ff };
-    const juce::Colour selection    { 0xffffffff };
-    const juce::Colour start        { 0xff4cc38a };
-    const juce::Colour end          { 0xffe06c75 };
-    const juce::Colour unreachable  { 0xffe0a84f };
-    const juce::Colour playhead     { 0xffffffff };
-}
+namespace colours = theme;
 
 namespace
 {
@@ -197,12 +183,24 @@ void GraphView::mouseMove (const juce::MouseEvent& e)
 {
     const auto* node = nodeAt (e.position);
 
+    if (const auto id = node != nullptr ? node->id : model::noNode; id != hoverNode)
+    {
+        hoverNode = id;
+        repaint();
+    }
+
     if (node == nullptr)
         setMouseCursor (juce::MouseCursor::NormalCursor);
     else if (isOnRing (*node, e.position))
         setMouseCursor (juce::MouseCursor::CrosshairCursor);
     else
         setMouseCursor (juce::MouseCursor::DraggingHandCursor);
+}
+
+void GraphView::mouseExit (const juce::MouseEvent&)
+{
+    hoverNode = model::noNode;
+    repaint();
 }
 
 void GraphView::mouseDown (const juce::MouseEvent& e)
@@ -395,9 +393,11 @@ void GraphView::paint (juce::Graphics& g)
 
 void GraphView::paintRuler (juce::Graphics& g) const
 {
-    g.setColour (colours::ruler);
-    g.fillRect (0, 0, getWidth(), rulerHeight);
-    g.setFont (12.0f);
+    // La regla y las líneas de pulso solo tienen sentido cuando X es el tiempo.
+    if (track == nullptr || track->mode != model::PlaybackMode::Timeline)
+        return;
+
+    g.setFont (11.0f);
 
     const auto beatWidth = static_cast<float> (model::pixelsPerBeat) * zoom;
 
@@ -414,13 +414,15 @@ void GraphView::paintRuler (juce::Graphics& g) const
         if (x > static_cast<float> (getWidth()))
             break;
 
-        g.setColour (colours::gridLine);
+        g.setColour (colours::grid);
         g.drawVerticalLine (juce::roundToInt (x), static_cast<float> (rulerHeight), static_cast<float> (getHeight()));
+        g.setColour (colours::textDisabled);
+        g.drawVerticalLine (juce::roundToInt (x), static_cast<float> (rulerHeight) - 6.0f, static_cast<float> (rulerHeight));
 
         if (beat % labelEvery == 0)
         {
-            g.setColour (colours::quietText);
-            g.drawText (juce::String (beat), juce::roundToInt (x) + 4, 0, 40, rulerHeight, juce::Justification::centredLeft);
+            g.setColour (colours::textDisabled);
+            g.drawText (juce::String (beat), juce::roundToInt (x) + 4, 0, 40, rulerHeight - 4, juce::Justification::centredLeft);
         }
     }
 }
@@ -445,11 +447,11 @@ void GraphView::paintEdges (juce::Graphics& g) const
         const juce::Line<float> line (a + direction * nodeRadius, b - direction * (nodeRadius + 2.0f));
 
         const bool selected = e.id == selectedEdge;
-        g.setColour (selected ? colours::selection : colours::edge);
-        const auto thickness = selected ? 2.5f : 1.5f;
+        g.setColour (selected ? colours::edgeSelected : colours::edge);
+        const auto thickness = selected ? 2.0f : 1.2f;
 
         if (track->directed)
-            g.drawArrow (line, thickness, 10.0f, 10.0f);
+            g.drawArrow (line, thickness, 8.0f, 8.0f);
         else
             g.drawLine (line, thickness);
     }
@@ -469,7 +471,7 @@ void GraphView::paintConnectionPreview (juce::Graphics& g) const
         end = toScreen (*target);
 
     const float dashes[] = { 6.0f, 4.0f };
-    g.setColour (colours::sounding);
+    g.setColour (colours::nodeSounding);
     g.drawDashedLine (juce::Line<float> (toScreen (*from), end), dashes, 2, 1.5f);
 }
 
@@ -481,37 +483,53 @@ void GraphView::paintNodes (juce::Graphics& g) const
     {
         const auto centre = toScreen (node);
         const auto bounds = juce::Rectangle<float> (nodeRadius * 2.0f, nodeRadius * 2.0f).withCentre (centre);
+        const bool sounding = isSounding (node.id);
+        const bool isStart = node.id == track->startNode;
+        const bool isEnd = node.id == track->endNode;
 
-        if (node.id == selected || node.id == hoverTarget)
+        // Halo del nodo que suena.
+        if (sounding)
         {
-            g.setColour (colours::selection.withAlpha (0.25f));
-            g.fillEllipse (bounds.expanded (6.0f));
+            g.setColour (colours::nodeSounding.withAlpha (0.25f));
+            g.fillEllipse (bounds.expanded (8.0f));
         }
 
-        g.setColour (isSounding (node.id) ? colours::sounding : colours::node);
+        g.setColour (sounding ? colours::nodeSounding : colours::node);
         g.fillEllipse (bounds);
 
-        auto border = colours::nodeBorder;
-        auto thickness = 1.5f;
-
-        if (isUnreachable (node.id))          { border = colours::unreachable; thickness = 3.0f; }
-        else if (node.id == track->startNode) { border = colours::start;       thickness = 3.0f; }
-        else if (node.id == track->endNode)   { border = colours::end;         thickness = 3.0f; }
-
-        g.setColour (border);
-        g.drawEllipse (bounds, thickness);
-
-        g.setColour (colours::quietText);
-        g.setFont (12.0f);
-        g.drawText (juce::String (model::pitchNames (node.pitches)),
-                    juce::Rectangle<float> (140.0f, 16.0f).withCentre (centre.translated (0.0f, nodeRadius + 12.0f)),
-                    juce::Justification::centred);
-
-        if (node.id == track->startNode || node.id == track->endNode)
+        // Anillo de estado: inalcanzable, inicio o fin.
+        if (isUnreachable (node.id) || isStart || isEnd)
         {
-            g.setColour (node.id == track->startNode ? colours::start : colours::end);
-            g.drawText (node.id == track->startNode ? "inicio" : "fin",
-                        juce::Rectangle<float> (80.0f, 14.0f).withCentre (centre.translated (0.0f, -nodeRadius - 10.0f)),
+            const auto ring = isUnreachable (node.id) ? colours::unreachable
+                            : isStart                 ? colours::nodeStart
+                                                      : colours::nodeEnd;
+            g.setColour (ring);
+            g.drawEllipse (bounds.expanded (4.0f), 2.5f);
+        }
+
+        // Selección o destino al conectar: contorno claro por fuera de todo.
+        if (node.id == selected || node.id == hoverTarget)
+        {
+            g.setColour (colours::edgeSelected);
+            g.drawEllipse (bounds.expanded (isStart || isEnd || isUnreachable (node.id) ? 8.0f : 4.0f), 1.5f);
+        }
+
+        // Nombres de las notas: solo al pasar el ratón o con el nodo seleccionado.
+        if (node.id == hoverNode || node.id == selected)
+        {
+            g.setColour (colours::textPrimary);
+            g.setFont (12.0f);
+            g.drawText (juce::String (model::pitchNames (node.pitches)),
+                        juce::Rectangle<float> (160.0f, 16.0f).withCentre (centre.translated (0.0f, nodeRadius + 16.0f)),
+                        juce::Justification::centred);
+        }
+
+        if (isStart || isEnd)
+        {
+            g.setColour (isStart ? colours::nodeStart : colours::nodeEnd);
+            g.setFont (11.0f);
+            g.drawText (isStart ? "inicio" : "fin",
+                        juce::Rectangle<float> (80.0f, 14.0f).withCentre (centre.translated (0.0f, -nodeRadius - 14.0f)),
                         juce::Justification::centred);
         }
     }
@@ -535,7 +553,7 @@ void GraphView::paintPlayhead (juce::Graphics& g) const
 
 void GraphView::paintEmptyHint (juce::Graphics& g) const
 {
-    g.setColour (colours::quietText);
+    g.setColour (colours::textSecondary);
     g.setFont (15.0f);
     g.drawText (text ("Doble clic para crear un nodo · arrastra desde el borde de un nodo para conectarlo"),
                 getLocalBounds().withTrimmedTop (rulerHeight), juce::Justification::centred);
