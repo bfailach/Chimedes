@@ -295,3 +295,52 @@ TEST ("instrumentos: un id inválido vuelve al de la pista o al órgano")
     REQUIRE (result.ok());
     CHECK (eventOf (*result.schedule, 1)->instrument == model::instruments::organ);
 }
+
+// ---------------------------------------------------------------------------
+// Origen de cada nota (lo usa la interfaz para animar la arista recorrida)
+// ---------------------------------------------------------------------------
+
+TEST ("algoritmo: cada evento sabe desde qué nodo se llegó (su padre en el árbol)")
+{
+    const auto result = engine::buildSchedule (branching());
+    CHECK (result.ok());
+    const auto& s = *result.schedule;
+
+    CHECK (eventOf (s, 1)->from == model::noNode);
+    CHECK (eventOf (s, 2)->from == 1);
+    CHECK (eventOf (s, 3)->from == 1);
+    CHECK (eventOf (s, 4)->from == 2);
+    CHECK (eventOf (s, 5)->from == 3);
+}
+
+TEST ("hermanos simultáneos: el grupo comparte el padre como origen")
+{
+    auto t = branching();
+    t.siblings = model::SiblingMode::Simultaneous;
+
+    const auto result = engine::buildSchedule (t);
+    CHECK (result.ok());
+    const auto& s = *result.schedule;
+
+    CHECK (eventOf (s, 2)->from == 1);
+    CHECK (eventOf (s, 3)->from == 1);
+}
+
+TEST ("línea de tiempo: el origen es el vecino conectado que sonó justo antes")
+{
+    model::Track t;
+    t.directed = false;
+    t.nodes = { node (1, 0, 0), node (2, 100, 0), node (3, 200, 50), node (4, 300, 0) };
+    t.edges = { edge (1, 2), edge (2, 3), edge (1, 4), edge (3, 4) };
+    t.startNode = 1;
+    t.endNode = 4;
+
+    const auto result = engine::buildSchedule (t);
+    CHECK (result.ok());
+    const auto& s = *result.schedule;
+
+    CHECK (eventOf (s, 1)->from == model::noNode);
+    CHECK (eventOf (s, 2)->from == 1);
+    CHECK (eventOf (s, 3)->from == 2);
+    CHECK (eventOf (s, 4)->from == 3);   // 3 sonó después que 1
+}

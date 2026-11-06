@@ -16,6 +16,9 @@ ChimedesLookAndFeel::ChimedesLookAndFeel()
                               theme::controlPressed,  // highlightedFill
                               theme::textPrimary })   // menuText
 {
+    // Toda la interfaz usa Space Grotesk, incluida en el ejecutable.
+    setDefaultSansSerifTypeface (theme::sansTypeface());
+
     setColour (juce::ResizableWindow::backgroundColourId, theme::background);
 
     setColour (juce::Label::textColourId, theme::textPrimary);
@@ -34,7 +37,11 @@ ChimedesLookAndFeel::ChimedesLookAndFeel()
     setColour (juce::PopupMenu::backgroundColourId, theme::panel);
     setColour (juce::PopupMenu::textColourId, theme::textPrimary);
     setColour (juce::PopupMenu::highlightedBackgroundColourId, theme::controlHover);
-    setColour (juce::PopupMenu::highlightedTextColourId, theme::textPrimary);
+    setColour (juce::PopupMenu::highlightedTextColourId, theme::accent);
+
+    setColour (juce::TooltipWindow::backgroundColourId, theme::panel);
+    setColour (juce::TooltipWindow::textColourId, theme::textPrimary);
+    setColour (juce::TooltipWindow::outlineColourId, theme::panelOutline);
 
     setColour (juce::Slider::textBoxTextColourId, theme::textPrimary);
     setColour (juce::Slider::textBoxBackgroundColourId, theme::control);
@@ -122,10 +129,10 @@ void ChimedesLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int
     // Pista completa y tramo recorrido.
     g.setColour (theme::controlPressed);
     g.fillRoundedRectangle (left, cy - 2.0f, right - left, 4.0f, 2.0f);
-    g.setColour (theme::textSecondary);
+    g.setColour (slider.isEnabled() ? theme::accent : theme::textDisabled);
     g.fillRoundedRectangle (left, cy - 2.0f, thumbX - left, 4.0f, 2.0f);
 
-    g.setColour (slider.isEnabled() ? theme::textPrimary : theme::textDisabled);
+    g.setColour (slider.isEnabled() ? theme::accent : theme::textDisabled);
     g.fillEllipse (juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ thumbX, cy }));
 }
 
@@ -134,8 +141,8 @@ void ChimedesLookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& compo
 {
     const auto box = juce::Rectangle<float> (x, y, w, h).reduced (2.0f);
 
-    g.setColour (ticked ? theme::textSecondary : theme::control);
-    g.fillRoundedRectangle (box, 3.0f);
+    g.setColour (ticked ? theme::accent : theme::control);
+    g.fillRoundedRectangle (box, 4.0f);
 
     if (ticked)
     {
@@ -154,7 +161,7 @@ void ChimedesLookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& compo
 void ChimedesLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
 {
     g.fillAll (theme::panel);
-    g.setColour (theme::outline);
+    g.setColour (theme::panelOutline);
     g.drawRect (0, 0, width, height);
 }
 

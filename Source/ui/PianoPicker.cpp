@@ -79,7 +79,7 @@ void PianoPicker::updateRangeLabel()
     rangeLabel.setText (juce::String (model::pitchName (lowestPitch())) + juce::String::fromUTF8 (" – ")
                             + juce::String (model::pitchName (lowestPitch() + 23)),
                         juce::dontSendNotification);
-    rangeLabel.setColour (juce::Label::textColourId, hidden ? theme::node : theme::textSecondary);
+    rangeLabel.setColour (juce::Label::textColourId, hidden ? theme::accent : theme::textSecondary);
 }
 
 juce::Rectangle<float> PianoPicker::keyboardArea() const
@@ -160,7 +160,7 @@ void PianoPicker::paint (juce::Graphics& g)
 
             auto colour = isBlack (p) ? blackKey : (p == hovered ? whiteKeyHover : whiteKey);
             if (isSelected (p))
-                colour = theme::node;
+                colour = theme::pitchColour (p);   // la tecla toma el color de su nota
             if (! playable)
                 colour = theme::control;
 

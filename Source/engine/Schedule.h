@@ -16,6 +16,7 @@ struct NoteEvent
     int velocity = 100;
     model::NodeId node = model::noNode;  // para iluminar el nodo que suena
     model::InstrumentId instrument = 1;  // ya resuelto: el del nodo o el de la pista
+    model::NodeId from = model::noNode;  // nodo desde el que se llegó (para animar la arista)
 };
 
 // Horario inmutable de una pista: lo único que lee el hilo de audio.

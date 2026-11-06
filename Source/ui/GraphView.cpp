@@ -24,6 +24,42 @@ namespace
     constexpr float moveAreaFraction = 0.55f;
 
     enum MenuItem { setStart = 1, setEnd, deleteNode };
+
+    // Tiempos de la animación, en milisegundos.
+    constexpr double flashMs = 1600.0;      // del color intenso al pastel del rastro
+    constexpr double swellMs = 400.0;       // la estrella se hincha al sonar
+    constexpr double rippleMs = 1000.0;     // cada onda
+    constexpr double rippleDelayMs = 140.0; // separación entre ondas
+    constexpr double trailFadeMs = 900.0;   // el rastro del ciclo anterior se apaga
+    constexpr double maxSparkBeats = 1.0;   // la chispa recorre la arista en ≤ 1 pulso
+
+    double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
+
+    float clamp01 (double v) { return static_cast<float> (std::clamp (v, 0.0, 1.0)); }
+
+    juce::Colour mainColour (const std::vector<int>& pitches)
+    {
+        return pitches.empty() ? theme::accent : theme::pitchColour (pitches.front());
+    }
+
+    juce::Colour trailColour (const std::vector<int>& pitches)
+    {
+        return pitches.empty() ? theme::accent : theme::pitchTrail (pitches.front());
+    }
+
+    // Color mientras destella: del tono intenso al pastel.
+    juce::Colour flashColour (const std::vector<int>& pitches, double ageMs)
+    {
+        return mainColour (pitches).interpolatedWith (trailColour (pitches), clamp01 (ageMs / flashMs));
+    }
+
+    // Generador determinista para el fondo de estrellas: cada celda siempre igual.
+    juce::uint32 hashCell (int x, int y)
+    {
+        auto h = static_cast<juce::uint32> (x) * 73856093u ^ static_cast<juce::uint32> (y) * 19349663u;
+        h ^= h >> 13;  h *= 0x5bd1e995u;  h ^= h >> 15;
+        return h;
+    }
 }
 
 GraphView::GraphView()
@@ -54,14 +90,91 @@ void GraphView::setUnreachable (std::vector<model::NodeId> nodes)
     repaint();
 }
 
-void GraphView::setPlayhead (double beatInCycle, bool isPlaying)
+void GraphView::setPlayhead (double beatInCycle, bool isPlaying, double bpm)
 {
-    if (std::abs (beatInCycle - playheadBeat) > 1e-6 || isPlaying != playing)
+    // Al arrancar, la nota en la posición actual también debe destellar.
+    // (el audio puede ir ya un poco adelante cuando llega la primera posición).
+    if (isPlaying && ! playing)
+        animBeat = std::min (animBeat, beatInCycle) - 1.0e-6;
+
+    if (std::abs (beatInCycle - playheadBeat) > 1e-9 || isPlaying != playing)
+        playheadMs = nowMs();
+
+    playheadBeat = beatInCycle;
+    playing = isPlaying;
+    currentBpm = bpm;
+}
+
+// ---------------------------------------------------------------------------
+// Animación
+// ---------------------------------------------------------------------------
+
+void GraphView::onFrame()
+{
+    const auto now = nowMs();
+    const auto cycle = schedule != nullptr ? schedule->cycleLengthBeats : 0.0;
+
+    if (playing && cycle > 0.0)
     {
-        playheadBeat = beatInCycle;
-        playing = isPlaying;
-        repaint();
+        // La posición llega a ~30 Hz desde el audio; entre medias se interpola con el
+        // tempo, sin adelantarse más de dos llamadas (si el audio se detiene, se para).
+        const auto elapsed = std::min (now - playheadMs, 70.0) / 60000.0 * currentBpm;
+        auto target = playheadBeat + std::max (0.0, elapsed);
+        if (target >= cycle)
+            target -= cycle;
+
+        if (target + cycle * 0.5 < animBeat)   // dio la vuelta: ciclo nuevo
+        {
+            detectOnsets (animBeat, cycle, now);
+            startNewCycle (now);
+            detectOnsets (-1.0e-6, target, now);
+            animBeat = target;
+        }
+        else if (target > animBeat)
+        {
+            detectOnsets (animBeat, target, now);
+            animBeat = target;
+        }
     }
+    else
+    {
+        // Detenido (posición en 0 tras haber sonado): el rastro se apaga.
+        if (! playing && playheadBeat <= 0.0 && ! onsets.empty())
+            startNewCycle (now);
+
+        animBeat = playheadBeat;
+    }
+
+    if (playing || isAnimating (now))
+        repaint();
+}
+
+void GraphView::detectOnsets (double fromBeat, double toBeat, double now)
+{
+    if (schedule == nullptr)
+        return;
+
+    for (const auto& e : schedule->events)
+        if (e.startBeat > fromBeat && e.startBeat <= toBeat)
+            onsets[e.node] = { now, e.pitches, e.from };
+}
+
+void GraphView::startNewCycle (double now)
+{
+    previousOnsets = std::move (onsets);
+    onsets.clear();
+    cycleStartMs = now;
+}
+
+bool GraphView::isAnimating (double now) const noexcept
+{
+    if (now - cycleStartMs < trailFadeMs && ! previousOnsets.empty())
+        return true;
+
+    return std::any_of (onsets.begin(), onsets.end(), [now] (const auto& entry)
+    {
+        return now - entry.second.ms < flashMs;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -404,9 +517,22 @@ void GraphView::showNodeMenu (model::NodeId node)
 // Dibujo
 // ---------------------------------------------------------------------------
 
+float GraphView::starRadius (const model::Node& node) const noexcept
+{
+    // El tamaño sigue a la intensidad y crece un poco con el zoom.
+    const auto base = 4.5f + 5.5f * static_cast<float> (std::clamp (node.velocity, 1, 127)) / 127.0f;
+    return base * juce::jlimit (0.75f, 1.4f, std::sqrt (zoom));
+}
+
 void GraphView::paint (juce::Graphics& g)
 {
-    g.fillAll (colours::background);
+    const auto now = nowMs();
+
+    paintSky (g);
+
+    if (track != nullptr && track->mode == model::PlaybackMode::Algorithm)
+        paintAtlasGrid (g);
+
     paintRuler (g);
 
     if (track == nullptr)
@@ -416,9 +542,75 @@ void GraphView::paint (juce::Graphics& g)
         paintEmptyHint (g);
 
     paintEdges (g);
+    paintLitEdges (g, now);
+    paintSparks (g);
     paintConnectionPreview (g);
     paintPlayhead (g);
-    paintNodes (g);
+    paintNodes (g, now);
+}
+
+void GraphView::paintSky (juce::Graphics& g) const
+{
+    g.fillAll (colours::background);
+
+    // Fondo de estrellas tenues con paralaje: se mueve al 30 % del desplazamiento.
+    constexpr float cell = 220.0f;
+    constexpr float parallax = 0.3f;
+    const auto offsetX = static_cast<float> (viewOrigin.x) * zoom * parallax;
+    const auto offsetY = static_cast<float> (viewOrigin.y) * zoom * parallax;
+
+    const auto firstX = static_cast<int> (std::floor (offsetX / cell));
+    const auto firstY = static_cast<int> (std::floor (offsetY / cell));
+    const auto columns = static_cast<int> (std::ceil (static_cast<float> (getWidth()) / cell)) + 1;
+    const auto rows = static_cast<int> (std::ceil (static_cast<float> (getHeight()) / cell)) + 1;
+
+    for (int cy = firstY; cy <= firstY + rows; ++cy)
+        for (int cx = firstX; cx <= firstX + columns; ++cx)
+        {
+            juce::Random random (static_cast<juce::int64> (hashCell (cx, cy)));
+
+            for (int i = 0; i < 7; ++i)
+            {
+                const auto x = (static_cast<float> (cx) + random.nextFloat()) * cell - offsetX;
+                const auto y = (static_cast<float> (cy) + random.nextFloat()) * cell - offsetY;
+                const auto r = 0.3f + 0.8f * random.nextFloat();
+                const auto alpha = 0.05f + 0.25f * random.nextFloat();
+
+                g.setColour (juce::Colours::white.withAlpha (alpha));
+                g.fillEllipse (x - r, y - r, 2.0f * r, 2.0f * r);
+            }
+        }
+}
+
+void GraphView::paintAtlasGrid (juce::Graphics& g) const
+{
+    // Líneas curvas de un atlas celeste, ancladas al modelo: se mueven con el grafo.
+    constexpr double spacing = 320.0;
+    const auto topLeft = toModel ({ 0.0f, static_cast<float> (rulerHeight) });
+    const auto bottomRight = toModel ({ static_cast<float> (getWidth()), static_cast<float> (getHeight()) });
+    const auto w = static_cast<float> (getWidth());
+    const auto h = static_cast<float> (getHeight());
+    const auto bow = 28.0f * zoom;
+
+    g.setColour (colours::grid);
+
+    for (auto y = std::floor (topLeft.y / spacing) * spacing; y <= bottomRight.y + spacing; y += spacing)
+    {
+        const auto sy = toScreen (0.0, y).y;
+        juce::Path p;
+        p.startNewSubPath (0.0f, sy);
+        p.quadraticTo (w * 0.5f, sy - bow, w, sy);
+        g.strokePath (p, juce::PathStrokeType (1.0f));
+    }
+
+    for (auto x = std::floor (topLeft.x / spacing) * spacing; x <= bottomRight.x + spacing; x += spacing)
+    {
+        const auto sx = toScreen (x, 0.0).x;
+        juce::Path p;
+        p.startNewSubPath (sx, static_cast<float> (rulerHeight));
+        p.quadraticTo (sx - bow * 0.6f, h * 0.5f, sx, h);
+        g.strokePath (p, juce::PathStrokeType (1.0f));
+    }
 }
 
 void GraphView::paintRuler (juce::Graphics& g) const
@@ -427,7 +619,7 @@ void GraphView::paintRuler (juce::Graphics& g) const
     if (track == nullptr || track->mode != model::PlaybackMode::Timeline)
         return;
 
-    g.setFont (11.0f);
+    g.setFont (theme::mono (10.5f));
 
     const auto beatWidth = static_cast<float> (model::pixelsPerBeat) * zoom;
 
@@ -470,22 +662,119 @@ void GraphView::paintEdges (juce::Graphics& g) const
 
         const auto a = toScreen (*from);
         const auto b = toScreen (*to);
+        const auto ra = starRadius (*from) + 5.0f;
+        const auto rb = starRadius (*to) + 5.0f;
         const auto length = a.getDistanceFrom (b);
-        if (length <= 2.0f * nodeRadius)
+        if (length <= ra + rb)
             continue;
 
-        // La línea va de borde a borde de los círculos, no de centro a centro.
+        // La línea va de borde a borde de las estrellas, con un pequeño espacio.
         const auto direction = (b - a) / length;
-        const juce::Line<float> line (a + direction * nodeRadius, b - direction * (nodeRadius + 2.0f));
+        const juce::Line<float> line (a + direction * ra, b - direction * rb);
 
         const bool selected = e.id == selectedEdge;
         g.setColour (selected ? colours::edgeSelected : colours::edge);
-        const auto thickness = selected ? 2.0f : 1.2f;
+        const auto thickness = selected ? 1.8f : 1.0f;
 
         if (track->directed)
-            g.drawArrow (line, thickness, 8.0f, 8.0f);
+            g.drawArrow (line, thickness, 7.0f, 7.0f);
         else
             g.drawLine (line, thickness);
+    }
+}
+
+void GraphView::paintLitEdges (juce::Graphics& g, double now) const
+{
+    // Aristas ya recorridas: degradado del color de una nota al de la siguiente.
+    auto paintSet = [&] (const std::unordered_map<model::NodeId, Onset>& set, float fade, bool skipRelit)
+    {
+        for (const auto& [id, onset] : set)
+        {
+            if (onset.from == model::noNode || (skipRelit && onsets.contains (id)))
+                continue;
+
+            const auto* from = track->findNode (onset.from);
+            const auto* to = track->findNode (id);
+            if (from == nullptr || to == nullptr)
+                continue;
+
+            const auto a = toScreen (*from);
+            const auto b = toScreen (*to);
+            const auto ra = starRadius (*from) + 5.0f;
+            const auto rb = starRadius (*to) + 5.0f;
+            const auto length = a.getDistanceFrom (b);
+            if (length <= ra + rb)
+                continue;
+
+            const auto direction = (b - a) / length;
+            const auto p0 = a + direction * ra;
+            const auto p1 = b - direction * rb;
+
+            const auto age = now - onset.ms;
+            const auto fromPitches = set.contains (onset.from) ? set.at (onset.from).pitches : from->pitches;
+            const auto c0 = flashColour (fromPitches, age);
+            const auto c1 = flashColour (onset.pitches, age);
+            const auto alpha = (1.0f - 0.35f * clamp01 (age / flashMs)) * fade;
+
+            g.setGradientFill (juce::ColourGradient (c0.withAlpha (alpha), p0, c1.withAlpha (alpha), p1, false));
+            g.drawLine (juce::Line<float> (p0, p1), 2.0f);
+        }
+    };
+
+    const auto fade = 1.0f - clamp01 ((now - cycleStartMs) / trailFadeMs);
+    if (fade > 0.0f)
+        paintSet (previousOnsets, fade, true);
+
+    paintSet (onsets, 1.0f, false);
+}
+
+void GraphView::paintSparks (juce::Graphics& g) const
+{
+    // Chispa que viaja hacia la próxima nota, con una cola que recorre el espectro.
+    if (! playing || schedule == nullptr)
+        return;
+
+    for (const auto& e : schedule->events)
+    {
+        if (e.from == model::noNode || onsets.contains (e.node) || e.startBeat < animBeat)
+            continue;
+
+        const auto parent = std::find_if (schedule->events.begin(), schedule->events.end(),
+                                          [&e] (const engine::NoteEvent& p) { return p.node == e.from; });
+        if (parent == schedule->events.end() || parent->startBeat >= e.startBeat)
+            continue;
+
+        const auto window = std::min (e.startBeat - parent->startBeat, maxSparkBeats);
+        const auto progress = (animBeat - (e.startBeat - window)) / window;
+        if (progress <= 0.0 || progress >= 1.0)
+            continue;
+
+        const auto* from = track->findNode (e.from);
+        const auto* to = track->findNode (e.node);
+        if (from == nullptr || to == nullptr)
+            continue;
+
+        const auto a = toScreen (*from);
+        const auto b = toScreen (*to);
+        const auto hueA = parent->pitches.empty() ? 0.0f : static_cast<float> (parent->pitches.front() % 12) / 12.0f;
+        const auto hueB = e.pitches.empty() ? 0.0f : static_cast<float> (e.pitches.front() % 12) / 12.0f;
+
+        // Línea que se va trazando detrás de la chispa.
+        const auto head = a + (b - a) * static_cast<float> (progress);
+        g.setGradientFill (juce::ColourGradient (theme::pitchColour (parent->pitches.empty() ? 0 : parent->pitches.front()).withAlpha (0.8f), a,
+                                                 theme::pitchColour (e.pitches.empty() ? 0 : e.pitches.front()).withAlpha (0.8f), b, false));
+        g.drawLine (juce::Line<float> (a + (b - a).toFloat() * (starRadius (*from) + 5.0f) / a.getDistanceFrom (b), head), 2.0f);
+
+        for (int q = 0; q < 5; ++q)
+        {
+            const auto t = std::max (0.0, progress - q * 0.05);
+            const auto p = a + (b - a) * static_cast<float> (t);
+            const auto hue = std::fmod (hueA + (hueB - hueA) * static_cast<float> (t) + static_cast<float> (q) * 0.07f + 1.0f, 1.0f);
+            const auto r = 3.0f - static_cast<float> (q) * 0.45f;
+
+            g.setColour (juce::Colour::fromHSL (hue, 0.95f, 0.66f, 1.0f - static_cast<float> (q) * 0.18f));
+            g.fillEllipse (p.x - r, p.y - r, 2.0f * r, 2.0f * r);
+        }
     }
 }
 
@@ -502,66 +791,121 @@ void GraphView::paintConnectionPreview (juce::Graphics& g) const
     if (const auto* target = track->findNode (hoverTarget))
         end = toScreen (*target);
 
-    const float dashes[] = { 6.0f, 4.0f };
-    g.setColour (colours::nodeSounding);
-    g.drawDashedLine (juce::Line<float> (toScreen (*from), end), dashes, 2, 1.5f);
+    const float dashes[] = { 4.0f, 5.0f };
+    g.setColour (colours::accent.withAlpha (0.8f));
+    g.drawDashedLine (juce::Line<float> (toScreen (*from), end), dashes, 2, 1.2f);
 }
 
-void GraphView::paintNodes (juce::Graphics& g) const
+void GraphView::paintNodes (juce::Graphics& g, double now) const
 {
     const auto selected = getSelectedNode();
+    const auto trailFade = 1.0f - clamp01 ((now - cycleStartMs) / trailFadeMs);
 
     for (const auto& node : track->nodes)
     {
         const auto centre = toScreen (node);
-        const auto bounds = juce::Rectangle<float> (nodeRadius * 2.0f, nodeRadius * 2.0f).withCentre (centre);
-        const bool sounding = isSounding (node.id);
+        const auto radius = starRadius (node);
         const bool isStart = node.id == track->startNode;
         const bool isEnd = node.id == track->endNode;
+        const bool hasStatusRing = isUnreachable (node.id) || isStart || isEnd;
 
-        // Halo del nodo que suena.
-        if (sounding)
+        const auto onset = onsets.find (node.id);
+        const bool lit = onset != onsets.end();
+        const auto age = lit ? now - onset->second.ms : 0.0;
+        const auto& pitches = lit ? onset->second.pitches : node.pitches;
+
+        // Zona para conectar (el anillo exterior) al pasar el ratón.
+        if (node.id == hoverNode && drag == Drag::None)
         {
-            g.setColour (colours::nodeSounding.withAlpha (0.25f));
-            g.fillEllipse (bounds.expanded (8.0f));
+            g.setColour (colours::accent.withAlpha (0.08f));
+            g.fillEllipse (juce::Rectangle<float> (nodeRadius * 2.0f, nodeRadius * 2.0f).withCentre (centre));
         }
 
-        g.setColour (sounding ? colours::nodeSounding : colours::node);
-        g.fillEllipse (bounds);
+        // Ondas de colores vecinos; en un acorde, la última toma el color de su otra nota.
+        if (lit)
+        {
+            for (int q = 0; q < 3; ++q)
+            {
+                const auto d = age - q * rippleDelayMs;
+                if (d < 0.0 || d > rippleMs)
+                    continue;
+
+                const auto progress = clamp01 (d / rippleMs);
+                const auto colour = (q == 2 && pitches.size() > 1)
+                                        ? theme::pitchColour (pitches.back())
+                                        : mainColour (pitches).withRotatedHue (static_cast<float> (q) * 35.0f / 360.0f);
+                const auto r = radius + 4.0f + progress * (24.0f + 10.0f * static_cast<float> (q)) * juce::jlimit (0.75f, 1.4f, std::sqrt (zoom));
+
+                g.setColour (colour.withAlpha (0.85f * (1.0f - progress)));
+                g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (centre), 1.5f);
+            }
+        }
+
+        // Halo mientras la nota suena.
+        if (isSounding (node.id))
+        {
+            const auto halo = radius + 11.0f;
+            g.setColour ((lit ? mainColour (pitches) : colours::accent).withAlpha (0.35f));
+            g.drawEllipse (juce::Rectangle<float> (2.0f * halo, 2.0f * halo).withCentre (centre), 1.0f);
+        }
+
+        // La estrella: gris en reposo, color de su nota al sonar, pastel en el rastro.
+        auto fill = colours::star;
+        auto drawRadius = radius;
+
+        if (lit)
+        {
+            fill = flashColour (pitches, age);
+            drawRadius += 3.5f * (1.0f - clamp01 (age / swellMs));
+        }
+        else if (const auto previous = previousOnsets.find (node.id); previous != previousOnsets.end() && trailFade > 0.0f)
+        {
+            fill = colours::star.interpolatedWith (trailColour (previous->second.pitches), trailFade);
+        }
+
+        g.setColour (fill);
+        g.fillEllipse (juce::Rectangle<float> (2.0f * drawRadius, 2.0f * drawRadius).withCentre (centre));
 
         // Anillo de estado: inalcanzable, inicio o fin.
-        if (isUnreachable (node.id) || isStart || isEnd)
+        if (hasStatusRing)
         {
             const auto ring = isUnreachable (node.id) ? colours::unreachable
                             : isStart                 ? colours::nodeStart
                                                       : colours::nodeEnd;
+            const auto r = radius + 5.0f;
             g.setColour (ring);
-            g.drawEllipse (bounds.expanded (4.0f), 2.5f);
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (centre), 1.5f);
         }
 
-        // Selección o destino al conectar: contorno claro por fuera de todo.
+        // Selección o destino al conectar: contorno blanco estelar por fuera de todo.
         if (node.id == selected || node.id == hoverTarget)
         {
-            g.setColour (colours::edgeSelected);
-            g.drawEllipse (bounds.expanded (isStart || isEnd || isUnreachable (node.id) ? 8.0f : 4.0f), 1.5f);
+            const auto r = radius + (hasStatusRing ? 10.0f : 6.0f);
+            g.setColour (colours::accent);
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (centre), 1.2f);
         }
 
-        // Nombres de las notas: solo al pasar el ratón o con el nodo seleccionado.
+        // Nombre de las notas arriba a la derecha: tenue, más claro al seleccionar o
+        // al pasar el ratón, y en el color de la nota mientras destella.
+        auto labelColour = colours::textDisabled.brighter (0.25f);
         if (node.id == hoverNode || node.id == selected)
-        {
-            g.setColour (colours::textPrimary);
-            g.setFont (12.0f);
-            g.drawText (juce::String (model::pitchNames (node.pitches)),
-                        juce::Rectangle<float> (160.0f, 16.0f).withCentre (centre.translated (0.0f, nodeRadius + 16.0f)),
-                        juce::Justification::centred);
-        }
+            labelColour = colours::textPrimary;
+        if (lit)
+            labelColour = mainColour (pitches).interpolatedWith (labelColour, clamp01 (age / 2200.0));
+
+        g.setColour (labelColour);
+        g.setFont (theme::sans (12.0f));
+        const auto labelOrigin = centre.translated (radius + 7.0f, -radius - 18.0f);
+        g.drawText (juce::String (model::pitchNames (node.pitches)),
+                    juce::Rectangle<float> (labelOrigin.x, labelOrigin.y, 160.0f, 16.0f),
+                    juce::Justification::centredLeft);
 
         if (isStart || isEnd)
         {
             g.setColour (isStart ? colours::nodeStart : colours::nodeEnd);
-            g.setFont (11.0f);
+            g.setFont (theme::sans (11.0f));
             g.drawText (isStart ? "inicio" : "fin",
-                        juce::Rectangle<float> (80.0f, 14.0f).withCentre (centre.translated (0.0f, -nodeRadius - 14.0f)),
+                        juce::Rectangle<float> (80.0f, 14.0f).withCentre (centre.translated (0.0f, radius + 16.0f)),
                         juce::Justification::centred);
         }
     }
@@ -577,17 +921,17 @@ void GraphView::paintPlayhead (juce::Graphics& g) const
     if (start == nullptr)
         return;
 
-    const auto x = toScreen (start->x + model::beatsToPixels (playheadBeat), 0.0).x;
+    const auto x = toScreen (start->x + model::beatsToPixels (animBeat), 0.0).x;
 
-    g.setColour (colours::playhead.withAlpha (playing ? 0.8f : 0.35f));
-    g.drawLine (x, static_cast<float> (rulerHeight), x, static_cast<float> (getHeight()), 1.5f);
+    g.setColour (colours::playhead.withAlpha (playing ? 0.55f : 0.25f));
+    g.drawLine (x, static_cast<float> (rulerHeight), x, static_cast<float> (getHeight()), 1.0f);
 }
 
 void GraphView::paintEmptyHint (juce::Graphics& g) const
 {
     g.setColour (colours::textSecondary);
-    g.setFont (15.0f);
-    g.drawText (text ("Doble clic para crear un nodo · arrastra desde el borde de un nodo para conectarlo"),
+    g.setFont (theme::sans (15.0f));
+    g.drawText (text ("Doble clic para crear una estrella · arrastra desde su borde para conectarla"),
                 getLocalBounds().withTrimmedTop (rulerHeight), juce::Justification::centred);
 }
 
@@ -598,7 +942,7 @@ bool GraphView::isSounding (model::NodeId node) const noexcept
 
     return std::any_of (schedule->events.begin(), schedule->events.end(), [this, node] (const engine::NoteEvent& e)
     {
-        return e.node == node && playheadBeat >= e.startBeat && playheadBeat < e.startBeat + e.durationBeats;
+        return e.node == node && animBeat >= e.startBeat && animBeat < e.startBeat + e.durationBeats;
     });
 }
 

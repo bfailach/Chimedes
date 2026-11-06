@@ -17,10 +17,39 @@ using model::NodeId;
 
 namespace
 {
-    NoteEvent makeEvent (const model::Track& track, const model::Node& node, double startBeat)
+    NoteEvent makeEvent (const model::Track& track, const model::Node& node, double startBeat,
+                         NodeId from = model::noNode)
     {
         return { startBeat, node.durationBeats, node.pitches, node.velocity, node.id,
-                 model::resolveInstrument (track, node) };
+                 model::resolveInstrument (track, node), from };
+    }
+
+    // Modo línea de tiempo: no hay árbol, así que el nodo "de origen" es el vecino
+    // conectado que sonó más recientemente antes que él.
+    void linkTimelineSources (const model::Track& track, Schedule& schedule)
+    {
+        for (auto& event : schedule.events)
+        {
+            double latest = -1.0;
+
+            for (const auto& edge : track.edges)
+            {
+                NodeId other = model::noNode;
+                if (edge.to == event.node)                        other = edge.from;
+                else if (! track.directed && edge.from == event.node) other = edge.to;
+
+                if (other == model::noNode)
+                    continue;
+
+                for (const auto& candidate : schedule.events)
+                    if (candidate.node == other && candidate.startBeat < event.startBeat
+                        && candidate.startBeat > latest)
+                    {
+                        latest = candidate.startBeat;
+                        event.from = other;
+                    }
+            }
+        }
     }
 
     // Espera en pulsos correspondiente a una arista. Con ajuste al pulso, se redondea a
@@ -66,6 +95,7 @@ namespace
 
         schedule.cycleLengthBeats = model::pixelsToBeats (end.x - start.x) + end.durationBeats;
         sortEvents (schedule);
+        linkTimelineSources (track, schedule);
 
         result.schedule = std::move (schedule);
         return result;
@@ -85,7 +115,8 @@ namespace
                 time += waitBeats (tree.parentEdgeLength.at (id), track.quantizeBeats);
 
             const auto& node = *track.findNode (id);
-            schedule.events.push_back (makeEvent (track, node, time));
+            const auto from = id != tree.root ? tree.parent.at (id) : model::noNode;
+            schedule.events.push_back (makeEvent (track, node, time, from));
 
             if (id == track.endNode)
             {
@@ -138,7 +169,8 @@ namespace
             {
                 played.insert (member);
                 const auto& node = *track.findNode (member);
-                schedule.events.push_back (makeEvent (track, node, time));
+                const auto from = member != tree.root ? tree.parent.at (member) : model::noNode;
+                schedule.events.push_back (makeEvent (track, node, time, from));
 
                 if (member == track.endNode)
                 {

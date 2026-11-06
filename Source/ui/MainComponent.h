@@ -64,8 +64,12 @@ private:
     {
         void paint (juce::Graphics& g) override
         {
+            // Forma de píldora: el radio es la mitad de la altura.
+            const auto radius = static_cast<float> (getHeight()) * 0.5f;
             g.setColour (theme::panel);
-            g.fillRoundedRectangle (getLocalBounds().toFloat(), theme::cornerRadius);
+            g.fillRoundedRectangle (getLocalBounds().toFloat(), radius);
+            g.setColour (theme::panelOutline);
+            g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), radius, 1.0f);
         }
     };
 

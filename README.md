@@ -37,7 +37,19 @@ La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
 | Reproducir / pausa | Barra espaciadora |
 | Deshacer / rehacer | Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
 
-Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Colores de los nodos: anillo verde = inicio, violeta = fin, naranja = inalcanzable; el nodo que suena se ilumina. Los nombres de las notas aparecen al pasar el ratón o al seleccionar un nodo, y la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
+Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Anillos de los nodos: verde = inicio, violeta = fin, naranja = inalcanzable. Los nombres de las notas aparecen tenues junto a cada nodo y se aclaran al pasar el ratón o al seleccionarlo; la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
+
+### Aspecto: atlas estelar
+
+El lienzo se dibuja como un mapa de estrellas sobre negro suave (tema *Starlight*). Cada nodo es una estrella cuyo tamaño sigue a la intensidad. Al reproducir:
+
+- una chispa recorre la arista hacia la nota siguiente;
+- la estrella destella en el color de su nota y lanza ondas de colores vecinos (en un acorde, la última onda toma el color de su otra nota);
+- lo recorrido queda como un rastro pastel que se apaga al empezar el ciclo siguiente.
+
+Los colores siguen la rueda cromática por clase de nota: do rojo, re naranja, mi verde, sol azul, la violeta, si magenta. Un do es del mismo color en cualquier octava, y las teclas seleccionadas en el teclado del panel usan el mismo color. El resto de la interfaz es casi monocroma, con blanco estelar como único acento.
+
+Tipografías: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) para la interfaz y [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) para las cifras, ambas con licencia SIL Open Font License (ver `Resources/Fonts`). Van incluidas en el ejecutable.
 
 ## Instrumentos
 

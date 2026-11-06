@@ -8,7 +8,7 @@ namespace chimedes::ui
 {
 
 // Botón de transporte dibujado como icono: detener, reproducir o pausa.
-// Activado (toggle), el icono se pinta en el color de los nodos.
+// Activado (toggle), el icono se pinta sobre un círculo blanco estelar.
 class TransportButton : public juce::Button
 {
 public:
@@ -30,13 +30,19 @@ public:
             g.fillRoundedRectangle (bounds.reduced (2.0f), theme::controlRadius);
         }
 
-        auto colour = getToggleState() ? theme::node : theme::textPrimary;
+        auto colour = theme::textPrimary;
+        if (getToggleState())
+        {
+            g.setColour (theme::accent);
+            g.fillEllipse (juce::Rectangle<float> (30.0f, 30.0f).withCentre (bounds.getCentre()));
+            colour = theme::background;
+        }
         if (! isEnabled())
             colour = theme::textDisabled;
 
         g.setColour (colour);
 
-        const auto size = 16.0f;
+        const auto size = getToggleState() ? 12.0f : 14.0f;
         const auto area = juce::Rectangle<float> (size, size).withCentre (bounds.getCentre());
 
         switch (icon)
@@ -57,7 +63,7 @@ public:
 
             case Icon::Pause:
             {
-                const auto barWidth = 5.0f;
+                const auto barWidth = size * 0.3f;
                 g.fillRoundedRectangle (area.getX() + 2.0f, area.getY(), barWidth, size, 1.5f);
                 g.fillRoundedRectangle (area.getRight() - 2.0f - barWidth, area.getY(), barWidth, size, 1.5f);
                 break;

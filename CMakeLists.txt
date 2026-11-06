@@ -70,11 +70,21 @@ if(CHIMEDES_BUILD_APP)
         Source/Main.cpp
         Source/audio/AudioEngine.cpp
         Source/ui/ChimedesLookAndFeel.cpp
+        Source/ui/Fonts.cpp
         Source/ui/GraphView.cpp
         Source/ui/Inspector.cpp
         Source/ui/MainComponent.cpp
         Source/ui/PianoPicker.cpp
         Source/ui/WindowStyle.cpp
+    )
+
+    # Tipografías del tema (Space Grotesk y JetBrains Mono, licencia SIL OFL).
+    juce_add_binary_data(ChimedesFonts
+        HEADER_NAME BinaryData.h
+        NAMESPACE BinaryData
+        SOURCES
+            Resources/Fonts/SpaceGrotesk.ttf
+            Resources/Fonts/JetBrainsMono.ttf
     )
 
     target_compile_definitions(Chimedes PRIVATE
@@ -87,6 +97,7 @@ if(CHIMEDES_BUILD_APP)
     target_link_libraries(Chimedes
         PRIVATE
             chimedes_core
+            ChimedesFonts
             juce::juce_gui_extra
             juce::juce_audio_utils
         PUBLIC

@@ -239,6 +239,8 @@ void Inspector::paint (juce::Graphics& g)
 {
     g.setColour (theme::panel);
     g.fillRoundedRectangle (getLocalBounds().toFloat(), theme::cornerRadius);
+    g.setColour (theme::panelOutline);
+    g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), theme::cornerRadius, 1.0f);
 }
 
 int Inspector::getIdealHeight() const

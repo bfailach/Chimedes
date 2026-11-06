@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -12,8 +13,11 @@
 namespace chimedes::ui
 {
 
-// Lienzo del grafo: la regla de tiempo, los nodos y aristas, la línea de reproducción
-// y los nodos que suenan. También es el editor:
+// Lienzo del grafo, dibujado como un atlas estelar: cada nodo es una estrella cuyo
+// tamaño sigue a la intensidad. Al reproducir, una chispa recorre la arista hacia la
+// nota siguiente y la estrella destella en el color de su nota (ver theme::pitchColour),
+// con ondas de colores vecinos; lo recorrido queda como un rastro pastel hasta que
+// empieza el ciclo siguiente. También es el editor:
 //
 //   doble clic en vacío ........ crear nodo
 //   arrastrar el centro ........ mover nodo
@@ -33,7 +37,8 @@ public:
     void setTrack (const model::Track* newTrack);
     void setSchedule (std::shared_ptr<const engine::Schedule> newSchedule);
     void setUnreachable (std::vector<model::NodeId> nodes);
-    void setPlayhead (double beatInCycle, bool isPlaying);
+    // `bpm` permite interpolar la posición entre llamadas para animar a 60 fps.
+    void setPlayhead (double beatInCycle, bool isPlaying, double bpm);
 
     EditCallbacks callbacks;
     std::function<void (model::NodeId)> onSelectionChanged;
@@ -73,9 +78,21 @@ private:
     void showNodeMenu (model::NodeId node);
     void setSelection (model::NodeId node, model::EdgeId edge);
 
+    // Animación de reproducción: se llama en cada refresco de pantalla.
+    void onFrame();
+    void detectOnsets (double fromBeat, double toBeat, double nowMs);
+    void startNewCycle (double nowMs);
+    bool isAnimating (double nowMs) const noexcept;
+
+    float starRadius (const model::Node& node) const noexcept;
+
+    void paintSky (juce::Graphics& g) const;
+    void paintAtlasGrid (juce::Graphics& g) const;
+    void paintLitEdges (juce::Graphics& g, double nowMs) const;
+    void paintSparks (juce::Graphics& g) const;
     void paintRuler (juce::Graphics& g) const;
     void paintEdges (juce::Graphics& g) const;
-    void paintNodes (juce::Graphics& g) const;
+    void paintNodes (juce::Graphics& g, double nowMs) const;
     void paintPlayhead (juce::Graphics& g) const;
     void paintConnectionPreview (juce::Graphics& g) const;
     void paintEmptyHint (juce::Graphics& g) const;
@@ -87,7 +104,23 @@ private:
     std::shared_ptr<const engine::Schedule> schedule;
     std::vector<model::NodeId> unreachable;
     double playheadBeat = 0.0;
+    double playheadMs = 0.0;        // cuándo llegó `playheadBeat`
+    double currentBpm = 120.0;
     bool playing = false;
+
+    // Estado de la animación. `animBeat` es la posición interpolada que se dibuja.
+    struct Onset
+    {
+        double ms = 0.0;                    // cuándo empezó a sonar
+        std::vector<int> pitches;
+        model::NodeId from = model::noNode;
+    };
+
+    double animBeat = 0.0;
+    std::unordered_map<model::NodeId, Onset> onsets;          // ciclo actual
+    std::unordered_map<model::NodeId, Onset> previousOnsets;  // rastro que se apaga
+    double cycleStartMs = -1.0e9;
+    juce::VBlankAttachment vblank { this, [this] { onFrame(); } };
 
     juce::Point<double> viewOrigin { -80.0, -60.0 };
     float zoom = 1.0f;

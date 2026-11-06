@@ -255,7 +255,7 @@ void MainComponent::timerCallback()
     const auto cycle = schedule != nullptr ? schedule->cycleLengthBeats : 0.0;
     const auto beatInCycle = cycle > 0.0 ? std::fmod (position, cycle) : 0.0;
 
-    graphView.setPlayhead (beatInCycle, engine.isPlaying());
+    graphView.setPlayhead (beatInCycle, engine.isPlaying(), engine.getBpm());
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
 
     // Libera los horarios viejos unas dos veces por segundo.
