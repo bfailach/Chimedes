@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Engine tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build-tests -DCHIMEDES_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-tests --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build-tests -C Release --output-on-failure
+
+  windows-app:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DCHIMEDES_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --target Chimedes --parallel
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chimedes-windows-x64
+          path: build/Chimedes_artefacts/Release/Chimedes.exe
+          retention-days: 14

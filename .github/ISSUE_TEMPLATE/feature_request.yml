@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an idea for Chimedes
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like Chimedes to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What music or workflow would it make possible?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways you have thought of, or how you work around it today.

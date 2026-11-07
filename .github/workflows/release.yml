@@ -1,0 +1,102 @@
+name: Release
+
+# Push a tag such as v0.1.0 to build Chimedes.exe and publish a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build and publish, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          submodules: recursive
+
+      - name: Check that the tag matches the project version
+        shell: bash
+        run: |
+          version=$(sed -nE 's/^project\(Chimedes VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match project version $version in CMakeLists.txt"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Run engine tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/Chimedes
+          cp build/Chimedes_artefacts/Release/Chimedes.exe dist/Chimedes/
+          cp LICENSE dist/Chimedes/LICENSE.txt
+          cp Resources/Fonts/OFL-*.txt dist/Chimedes/
+          cp dist/Chimedes/Chimedes.exe "dist/Chimedes-$VERSION-windows-x64.exe"
+          cd dist
+          7z a -tzip "Chimedes-$VERSION-windows-x64.zip" Chimedes > /dev/null
+          sha256sum Chimedes-*.exe Chimedes-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: |
+            dist/Chimedes-*.exe
+            dist/Chimedes-*.zip
+            dist/SHA256SUMS.txt
+
+  publish:
+    name: Publish release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: dist
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '
+            /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Release $TAG" > notes.md; fi
+          cat notes.md
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/* --title "Chimedes $TAG" --notes-file notes.md
+          fi
