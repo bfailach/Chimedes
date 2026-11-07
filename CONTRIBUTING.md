@@ -29,9 +29,9 @@ ctest --test-dir build-tests --output-on-failure
 
 1. Update `project(Chimedes VERSION x.y.z)` in `CMakeLists.txt`.
 2. Move the **Unreleased** notes in `CHANGELOG.md` to a new `## [x.y.z] - YYYY-MM-DD` section.
-3. Commit, then tag and push: `git tag vx.y.z && git push origin vx.y.z`.
+3. Commit and push to `main`.
 
-The **Release** workflow builds `Chimedes.exe`, runs the tests and publishes the GitHub release with the notes from the changelog.
+The **Release** workflow sees that there is no release for that version yet, builds `Chimedes.exe`, runs the tests, creates the tag `vx.y.z` and publishes the GitHub release with the notes from the changelog. (Pushing a `vx.y.z` tag yourself works too.)
 
 ## Licence
 

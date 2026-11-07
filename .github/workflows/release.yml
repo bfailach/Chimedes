@@ -1,40 +1,73 @@
 name: Release
 
-# Push a tag such as v0.1.0 to build Chimedes.exe and publish a GitHub release.
+# Publishes a GitHub release with Chimedes.exe for the version in CMakeLists.txt.
+#
+# - On every push to main, if there is no release for that version yet, it builds
+#   it, creates the tag vX.Y.Z on that commit and publishes the release. Bumping
+#   the version (and adding its section to CHANGELOG.md) is all a release needs.
+# - Pushing a tag vX.Y.Z builds and publishes that tag.
+# - Run it by hand from the Actions tab to rebuild the current version.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing tag to (re)build and publish, e.g. v0.1.0
-        required: true
 
 permissions:
   contents: write
 
-env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  check:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -nE 's/^project\(Chimedes VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match project version $version in CMakeLists.txt"
+              exit 1
+            fi
+            publish=true
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            publish=true
+          elif gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to do."
+            publish=false
+          else
+            publish=true
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Version $version, publish: $publish"
+
   build-windows:
     name: Build Windows x64
+    needs: check
+    if: needs.check.outputs.publish == 'true'
     runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
           submodules: recursive
-
-      - name: Check that the tag matches the project version
-        shell: bash
-        run: |
-          version=$(sed -nE 's/^project\(Chimedes VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
-          if [ "v$version" != "$TAG" ]; then
-            echo "::error::Tag $TAG does not match project version $version in CMakeLists.txt"
-            exit 1
-          fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Configure
         run: cmake -S . -B build -A x64
@@ -68,12 +101,13 @@ jobs:
 
   publish:
     name: Publish release
-    needs: build-windows
+    needs: [check, build-windows]
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: ${{ needs.check.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -82,12 +116,11 @@ jobs:
 
       - name: Release notes from CHANGELOG.md
         run: |
-          version="${TAG#v}"
-          awk -v v="$version" '
+          awk -v v="$VERSION" '
             /^## \[/ { if (found) exit; if (index($0, "[" v "]")) { found = 1; next } }
             found { print }
           ' CHANGELOG.md > notes.md
-          if [ ! -s notes.md ]; then echo "Release $TAG" > notes.md; fi
+          if [ ! -s notes.md ]; then echo "Chimedes $TAG" > notes.md; fi
           cat notes.md
 
       - name: Create or update the release
@@ -98,5 +131,6 @@ jobs:
             gh release upload "$TAG" dist/* --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" dist/* --title "Chimedes $TAG" --notes-file notes.md
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" \
+              --title "Chimedes $TAG" --notes-file notes.md --latest
           fi
