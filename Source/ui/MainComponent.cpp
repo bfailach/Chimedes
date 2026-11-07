@@ -4,6 +4,7 @@
 
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
+#include "model/ProjectFile.h"
 #include "model/Randomizer.h"
 #include "ui/Text.h"
 #include "ui/Theme.h"
@@ -71,20 +72,15 @@ MainComponent::MainComponent()
     bpmSlider.setRange (40.0, 240.0, 1.0);
     bpmSlider.setValue (engine.getBpm(), juce::dontSendNotification);
     bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 44, 24);
-    bpmSlider.onValueChange = [this] { engine.setBpm (bpmSlider.getValue()); };
-
-    newButton.setTooltip (text ("Nuevo: lienzo vacío (se puede deshacer)"));
-    newButton.onClick = [this]
+    bpmSlider.onValueChange = [this]
     {
-        // Pista vacía con las mismas opciones; se puede deshacer.
-        applyEdit ([] (model::Track& t)
-        {
-            t.nodes.clear();
-            t.edges.clear();
-            t.startNode = model::noNode;
-            t.endNode = model::noNode;
-        });
+        engine.setBpm (bpmSlider.getValue());
+        updateTitle();
     };
+
+    newButton.onClick = [this] { newProject(); };
+    openButton.onClick = [this] { openProject(); };
+    saveButton.onClick = [this] { saveProject(); };
     randomButton.setTooltip (text ("Grafo nuevo al azar: cantidad de nodos, forma, separación y duración"));
     randomButton.onClick = [this]
     {
@@ -135,7 +131,7 @@ MainComponent::MainComponent()
 
     for (auto* c : std::initializer_list<juce::Component*> {
              &bpmLabel, &bpmSlider, &stopButton, &playButton, &pauseButton,
-             &randomButton, &newButton, &undoButton, &redoButton })
+             &randomButton, &newButton, &openButton, &saveButton, &undoButton, &redoButton })
         bottomBar.addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
@@ -152,6 +148,7 @@ MainComponent::MainComponent()
     undoManager.addChangeListener (this);
     trackChanged();
     updateUndoButtons();
+    markSaved();   // el grafo de demostración no cuenta como cambio sin guardar
 
     setWantsKeyboardFocus (true);
     setSize (1440, 900);
@@ -223,6 +220,7 @@ void MainComponent::trackChanged()
     rebuildSchedule();
     inspector.refresh (track, graphView.getSelectedNode());
     graphView.repaint();
+    updateTitle();
 }
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -312,6 +310,11 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
+    if (key == juce::KeyPress ('s', command, 0))                                    { saveProject();   return true; }
+    if (key == juce::KeyPress ('s', command | juce::ModifierKeys::shiftModifier, 0)) { saveProjectAs(); return true; }
+    if (key == juce::KeyPress ('o', command, 0))                                    { openProject();   return true; }
+    if (key == juce::KeyPress ('n', command, 0))                                    { newProject();    return true; }
+
     if (key == juce::KeyPress ('z', command | juce::ModifierKeys::shiftModifier, 0)
         || key == juce::KeyPress ('y', command, 0))
     {
@@ -352,12 +355,12 @@ void MainComponent::resized()
     area.reduce (margin, margin);
 
     // Barra inferior: mide lo justo para su contenido y queda centrada abajo.
-    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio, nuevo]  [deshacer, rehacer]
+    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio, nuevo, abrir, guardar]  [deshacer, rehacer]
     constexpr int pad = 12;
     constexpr int groupGap = 20;
     constexpr int bpmWidth = 38 + 170;
     constexpr int transportWidth = 3 * 44;
-    constexpr int actionsWidth = 4 * 40 + 2 + 14 + 2;
+    constexpr int actionsWidth = 6 * 40 + 3 * 2 + 14 + 2;
     constexpr int barWidth = pad + bpmWidth + groupGap + transportWidth + groupGap + actionsWidth + pad;
 
     auto barArea = area.removeFromBottom (barHeight);
@@ -374,11 +377,13 @@ void MainComponent::resized()
         pauseButton.setBounds (bar.removeFromLeft (44));
         bar.removeFromLeft (groupGap);
 
-        // Aleatorio y nuevo juntos; deshacer y rehacer juntos, un poco más separados.
-        randomButton.setBounds (bar.removeFromLeft (40));
-        bar.removeFromLeft (2);
-        newButton.setBounds (bar.removeFromLeft (40));
-        bar.removeFromLeft (14);
+        // Aleatorio y archivo juntos; deshacer y rehacer juntos, un poco más separados.
+        for (auto* b : { &randomButton, &newButton, &openButton, &saveButton })
+        {
+            b->setBounds (bar.removeFromLeft (40));
+            bar.removeFromLeft (2);
+        }
+        bar.removeFromLeft (12);
         undoButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (2);
         redoButton.setBounds (bar.removeFromLeft (40));
@@ -403,6 +408,234 @@ void MainComponent::resized()
     const auto centredTop = (getHeight() - panelHeight) / 2;
     const auto top = juce::jlimit (area.getY(), area.getBottom() - panelHeight, centredTop);
     inspector.setBounds (area.getRight() - inspectorWidth, top, inspectorWidth, panelHeight);
+}
+
+// ---------------------------------------------------------------------------
+// Archivos
+// ---------------------------------------------------------------------------
+
+bool MainComponent::hasUnsavedChanges() const
+{
+    return track != savedTrack || std::abs (engine.getBpm() - savedBpm) > 1e-9;
+}
+
+void MainComponent::markSaved()
+{
+    savedTrack = track;
+    savedBpm = engine.getBpm();
+    updateTitle();
+}
+
+void MainComponent::updateTitle()
+{
+    // "Lyra Nova • — Chimedes": el punto marca cambios sin guardar.
+    const auto name = currentFile == juce::File() ? text ("Sin título") : currentFile.getFileNameWithoutExtension();
+    const auto title = name + (hasUnsavedChanges() ? juce::String::fromUTF8 (" \xe2\x80\xa2") : juce::String())
+                     + juce::String::fromUTF8 (" \xe2\x80\x94 Chimedes");
+
+    if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
+        if (window->getName() != title)
+            window->setName (title);
+}
+
+void MainComponent::parentHierarchyChanged()
+{
+    updateTitle();
+}
+
+juce::File MainComponent::defaultFolder() const
+{
+    return currentFile != juce::File() ? currentFile.getParentDirectory()
+                                       : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+}
+
+void MainComponent::confirmDiscardChanges (std::function<void()> proceed)
+{
+    if (! hasUnsavedChanges())
+    {
+        proceed();
+        return;
+    }
+
+    const auto name = currentFile == juce::File() ? text ("el proyecto sin título")
+                                                  : "\"" + currentFile.getFileName() + "\"";
+
+    const auto options = juce::MessageBoxOptions()
+                             .withIconType (juce::MessageBoxIconType::NoIcon)
+                             .withTitle (text ("¿Guardar los cambios?"))
+                             .withMessage (text ("Hay cambios sin guardar en ") + name + text (". Si no los guardas, se perderán."))
+                             .withButton ("Guardar")
+                             .withButton ("No guardar")
+                             .withButton ("Cancelar")
+                             .withAssociatedComponent (this);
+
+    // Con tres botones, JUCE devuelve 1, 2 y 0 (el tercero también con Esc).
+    juce::AlertWindow::showAsync (options, [safeThis = juce::Component::SafePointer<MainComponent> (this),
+                                            proceed = std::move (proceed)] (int result)
+    {
+        if (safeThis == nullptr)
+            return;
+
+        if (result == 1)
+            safeThis->saveProject ([proceed] (bool saved) { if (saved) proceed(); });
+        else if (result == 2)
+            proceed();
+    });
+}
+
+void MainComponent::newProject()
+{
+    confirmDiscardChanges ([this]
+    {
+        // Documento nuevo y vacío, con las mismas opciones de pista.
+        engine.stop();
+        graphView.selectNode (model::noNode);
+
+        auto empty = track;
+        empty.nodes.clear();
+        empty.edges.clear();
+        empty.startNode = model::noNode;
+        empty.endNode = model::noNode;
+        empty.name.clear();
+
+        undoManager.clearUndoHistory();
+        currentFile = juce::File();
+        setTrack (empty);
+        markSaved();
+    });
+}
+
+void MainComponent::openProject()
+{
+    confirmDiscardChanges ([this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (text ("Abrir proyecto"), defaultFolder(),
+                                                           juce::String ("*") + model::projectFileExtension);
+
+        fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                  [this] (const juce::FileChooser& chooser)
+        {
+            const auto file = chooser.getResult();
+            if (file != juce::File())
+                openFile (file);
+        });
+    });
+}
+
+void MainComponent::openFile (const juce::File& file)
+{
+    const auto showError = [file] (const juce::String& message)
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
+                                          .withTitle (text ("No se pudo abrir ") + file.getFileName())
+                                          .withMessage (message)
+                                          .withButton ("Aceptar"),
+                                      nullptr);
+    };
+
+    if (! file.existsAsFile())
+    {
+        showError (text ("El archivo no existe."));
+        return;
+    }
+
+    const auto loaded = model::projectFromJson (file.loadFileAsString().toStdString());
+    if (! loaded.ok)
+    {
+        showError (juce::String::fromUTF8 (loaded.error.c_str()));
+        return;
+    }
+
+    engine.stop();
+    graphView.selectNode (model::noNode);
+    undoManager.clearUndoHistory();
+
+    // Por ahora la app edita una sola pista: se abre la primera.
+    currentFile = file;
+    bpmSlider.setValue (loaded.project.bpm, juce::sendNotificationSync);
+    setTrack (loaded.project.tracks.front());
+    markSaved();
+
+    graphView.zoomToFit (getLocalBounds().reduced (margin)
+                             .withTrimmedRight (inspectorWidth + 16)
+                             .withTrimmedBottom (barHeight + 16));
+}
+
+void MainComponent::saveProject (std::function<void (bool)> done)
+{
+    if (currentFile == juce::File())
+    {
+        saveProjectAs (std::move (done));
+        return;
+    }
+
+    const auto ok = writeFile (currentFile);
+    if (done)
+        done (ok);
+}
+
+void MainComponent::saveProjectAs (std::function<void (bool)> done)
+{
+    const auto suggested = currentFile != juce::File()
+                               ? currentFile
+                               : defaultFolder().getChildFile (text ("Sin título") + model::projectFileExtension);
+
+    fileChooser = std::make_unique<juce::FileChooser> (text ("Guardar proyecto"), suggested,
+                                                       juce::String ("*") + model::projectFileExtension);
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [this, done = std::move (done)] (const juce::FileChooser& chooser)
+    {
+        auto file = chooser.getResult();
+        if (file == juce::File())
+        {
+            if (done)
+                done (false);   // cancelado
+            return;
+        }
+
+        if (! file.hasFileExtension (model::projectFileExtension))
+            file = file.withFileExtension (model::projectFileExtension);
+
+        const auto ok = writeFile (file);
+        if (ok)
+            currentFile = file;
+
+        updateTitle();
+        if (done)
+            done (ok);
+    });
+}
+
+bool MainComponent::writeFile (const juce::File& file)
+{
+    model::Project project;
+    project.bpm = engine.getBpm();
+    project.tracks = { track };
+
+    // Se escribe en un temporal y luego se reemplaza: si algo falla, el archivo
+    // anterior queda intacto.
+    juce::TemporaryFile temp (file);
+    const auto json = juce::String::fromUTF8 (model::projectToJson (project).c_str());
+    const auto ok = temp.getFile().replaceWithText (json, false, false, "\n") && temp.overwriteTargetFileWithTemporary();
+
+    if (! ok)
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
+                                          .withTitle (text ("No se pudo guardar"))
+                                          .withMessage (text ("No se pudo escribir ") + file.getFullPathName()
+                                                        + text (". Revisa que la carpeta exista y que tengas permiso."))
+                                          .withButton ("Aceptar"),
+                                      nullptr);
+        return false;
+    }
+
+    currentFile = file;
+    markSaved();
+    return true;
 }
 
 } // namespace chimedes::ui

@@ -21,6 +21,7 @@ add_library(chimedes_core STATIC
     Source/model/TrackEditing.cpp
     Source/model/NoteNames.cpp
     Source/model/Randomizer.cpp
+    Source/model/ProjectFile.cpp
     Source/engine/Adjacency.cpp
     Source/engine/Validator.cpp
     Source/engine/TreeBuilder.cpp
@@ -45,6 +46,7 @@ if(CHIMEDES_BUILD_TESTS)
         Tests/ValidatorTests.cpp
         Tests/TreeBuilderTests.cpp
         Tests/SchedulerTests.cpp
+        Tests/ProjectFileTests.cpp
         Tests/SequencerTests.cpp
         Tests/EditingTests.cpp
         Tests/RandomizerTests.cpp

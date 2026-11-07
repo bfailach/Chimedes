@@ -12,11 +12,17 @@ public:
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override          { return true; }
 
-    void initialise (const juce::String&) override
+    void initialise (const juce::String& commandLine) override
     {
         // El tema se aplica a toda la app, también a menús y ventanas emergentes.
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         mainWindow = std::make_unique<MainWindow> (getApplicationName());
+
+        // Doble clic en un .chimedes: el sistema pasa la ruta como argumento.
+        const auto path = commandLine.unquoted().trim();
+        if (path.isNotEmpty() && juce::File::isAbsolutePath (path))
+            if (auto* content = mainContent())
+                content->openFile (juce::File (path));
     }
 
     void shutdown() override
@@ -27,7 +33,17 @@ public:
 
     void systemRequestedQuit() override
     {
-        quit();
+        // Con cambios sin guardar, primero se pregunta.
+        if (auto* content = mainContent())
+            content->confirmDiscardChanges ([] { juce::JUCEApplication::getInstance()->quit(); });
+        else
+            quit();
+    }
+
+    chimedes::ui::MainComponent* mainContent() const
+    {
+        return mainWindow != nullptr ? dynamic_cast<chimedes::ui::MainComponent*> (mainWindow->getContentComponent())
+                                     : nullptr;
     }
 
 private:

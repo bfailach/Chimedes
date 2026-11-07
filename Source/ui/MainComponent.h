@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -32,6 +33,15 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
     bool keyStateChanged (bool isKeyDown) override;
     void focusLost (FocusChangeType cause) override;
+    void parentHierarchyChanged() override;
+
+    // --- Archivos -------------------------------------------------------------
+    // Si hay cambios sin guardar, pregunta (Guardar / No guardar / Cancelar) y solo
+    // llama a `proceed` si se puede seguir. Lo usa también la app al cerrarse.
+    void confirmDiscardChanges (std::function<void()> proceed);
+
+    // Abre un proyecto (también desde la línea de comandos, al hacer doble clic).
+    void openFile (const juce::File& file);
 
 private:
     class TrackChange;
@@ -51,6 +61,17 @@ private:
     void togglePlayPause();
     void updateUndoButtons();
 
+    // Archivos
+    void newProject();
+    void openProject();
+    void saveProject (std::function<void (bool saved)> done = {});
+    void saveProjectAs (std::function<void (bool saved)> done = {});
+    bool writeFile (const juce::File& file);
+    void markSaved();
+    bool hasUnsavedChanges() const;
+    void updateTitle();
+    juce::File defaultFolder() const;
+
     // Audio
     audio::AudioEngine engine;
     juce::AudioDeviceManager deviceManager;
@@ -61,6 +82,12 @@ private:
     std::shared_ptr<const engine::Schedule> schedule;
     juce::UndoManager undoManager;
     std::optional<model::Track> gestureStart;
+
+    // Archivo abierto (vacío = sin título) y lo último guardado, para saber si hay cambios.
+    juce::File currentFile;
+    model::Track savedTrack;
+    double savedBpm = 120.0;
+    std::unique_ptr<juce::FileChooser> fileChooser;
 
     // Fondo redondeado de la barra inferior flotante.
     struct FloatingPanel : public juce::Component
@@ -85,7 +112,9 @@ private:
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
     IconButton randomButton { "Aleatorio", IconButton::Icon::Random };
-    IconButton newButton { "Nuevo", IconButton::Icon::New };
+    IconButton newButton { "Nuevo (Ctrl+N)", IconButton::Icon::New };
+    IconButton openButton { "Abrir (Ctrl+O)", IconButton::Icon::Open };
+    IconButton saveButton { "Guardar (Ctrl+S)", IconButton::Icon::Save };
     IconButton undoButton { "Deshacer (Ctrl+Z)", IconButton::Icon::Undo };
     IconButton redoButton { "Rehacer (Ctrl+Y)", IconButton::Icon::Redo };
     juce::Label statusLabel;

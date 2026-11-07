@@ -39,6 +39,10 @@ ChimedesLookAndFeel::ChimedesLookAndFeel()
     setColour (juce::PopupMenu::highlightedBackgroundColourId, theme::controlHover);
     setColour (juce::PopupMenu::highlightedTextColourId, theme::accent);
 
+    setColour (juce::AlertWindow::backgroundColourId, theme::panel);
+    setColour (juce::AlertWindow::textColourId, theme::textPrimary);
+    setColour (juce::AlertWindow::outlineColourId, theme::panelOutline);
+
     setColour (juce::TooltipWindow::backgroundColourId, theme::panel);
     setColour (juce::TooltipWindow::textColourId, theme::textPrimary);
     setColour (juce::TooltipWindow::outlineColourId, theme::panelOutline);

@@ -8,11 +8,12 @@ namespace chimedes::ui
 {
 
 // Botón de acción dibujado como icono de trazo: aleatorio (dado), nuevo (hoja),
-// deshacer y rehacer (flecha curva). El nombre aparece como tooltip.
+// abrir (carpeta), guardar (disquete), deshacer y rehacer (flecha curva). El nombre
+// aparece como tooltip.
 class IconButton : public juce::Button
 {
 public:
-    enum class Icon { Random, New, Undo, Redo };
+    enum class Icon { Random, New, Open, Save, Undo, Redo };
 
     IconButton (const juce::String& name, Icon iconToUse)
         : juce::Button (name), icon (iconToUse)
@@ -80,6 +81,42 @@ public:
                 plus.startNewSubPath (x + 7.0f, y + 11.0f);
                 plus.lineTo (x + 12.0f, y + 11.0f);
                 g.strokePath (plus, stroke);
+                break;
+            }
+
+            case Icon::Open:
+            {
+                // Carpeta con la solapa arriba a la izquierda.
+                juce::Path folder;
+                folder.startNewSubPath (x + 1.5f, y + 4.0f);
+                folder.lineTo (x + 6.5f, y + 4.0f);
+                folder.lineTo (x + 8.5f, y + 6.0f);
+                folder.lineTo (x + 16.5f, y + 6.0f);
+                folder.lineTo (x + 16.5f, y + 15.0f);
+                folder.lineTo (x + 1.5f, y + 15.0f);
+                folder.closeSubPath();
+                folder.startNewSubPath (x + 1.5f, y + 8.5f);
+                folder.lineTo (x + 16.5f, y + 8.5f);
+                g.strokePath (folder, stroke);
+                break;
+            }
+
+            case Icon::Save:
+            {
+                // Disquete: cuerpo con esquina cortada, etiqueta abajo y obturador arriba.
+                juce::Path disk;
+                disk.startNewSubPath (x + 2.0f, y + 2.0f);
+                disk.lineTo (x + 13.0f, y + 2.0f);
+                disk.lineTo (x + 16.0f, y + 5.0f);
+                disk.lineTo (x + 16.0f, y + 16.0f);
+                disk.lineTo (x + 2.0f, y + 16.0f);
+                disk.closeSubPath();
+                disk.startNewSubPath (x + 5.5f, y + 2.0f);
+                disk.lineTo (x + 5.5f, y + 6.0f);
+                disk.lineTo (x + 11.5f, y + 6.0f);
+                disk.lineTo (x + 11.5f, y + 2.0f);
+                disk.addRoundedRectangle (x + 5.0f, y + 10.0f, 8.0f, 6.0f, 1.0f);
+                g.strokePath (disk, stroke);
                 break;
             }
 
