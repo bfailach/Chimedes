@@ -122,8 +122,9 @@ MainComponent::MainComponent()
     openButton.onClick = [this] { openProject(); };
     saveButton.onClick = [this] { saveProject(); };
     exportButton.onClick = [this] { showExportMenu(); };
-    randomButton.setTooltip ("Random: graph, notes, rhythm, instruments or algorithm");
-    randomButton.onClick = [this] { showRandomMenu(); };
+    randomButton.onClick = [this] { applyRandom (randomKind); };
+    randomOptionsButton.onClick = [this] { showRandomOptions(); };
+    updateRandomTooltip();
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
 
@@ -173,6 +174,8 @@ MainComponent::MainComponent()
 
     // The canvas fills the whole window; the panels float on top.
     addAndMakeVisible (graphView);
+    addChildComponent (dimOverlay);
+    dimOverlay.onClick = [this] { closeGlance (GlanceClose::Keep); };
     addAndMakeVisible (inspector);
     addAndMakeVisible (trackList);
     addAndMakeVisible (topBar);
@@ -189,7 +192,7 @@ MainComponent::MainComponent()
 
     for (auto* c : std::initializer_list<juce::Component*> {
              &bpmLabel, &bpmSlider, &stopButton, &playButton, &pauseButton,
-             &randomButton, &undoButton, &redoButton })
+             &randomButton, &randomOptionsButton, &undoButton, &redoButton })
         bottomBar.addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
@@ -292,7 +295,7 @@ void MainComponent::setProject (const model::Project& newProject, std::size_t ne
     // if the track vector changes size, those pointers stay invalid until
     // projectChanged() hands it the new ones.
     if (trackChanged)
-        graphView.selectNode (model::noNode);
+        clearSelection();
 
     project = newProject;
     if (project.tracks.empty())
@@ -307,17 +310,29 @@ void MainComponent::setActiveTrack (std::size_t index)
     if (index >= project.tracks.size() || index == active)
         return;
 
+    // Choosing another track closes the track window (the track stays).
+    if (glance != nullptr && glanceTrackIndex() != index)
+        closeGlance (GlanceClose::Keep, true);
+
     // Switching tracks is not an edit: it does not go into the history.
-    graphView.selectNode (model::noNode);
+    clearSelection();
     active = index;
     projectChanged();
 }
 
 void MainComponent::projectChanged()
 {
+    // Undo can remove the track shown in the window: then the window closes.
+    if (glance != nullptr && ! glanceTrackIndex().has_value())
+    {
+        glance.reset();
+        glanceTrackId = 0;
+        dimOverlay.setVisible (false);
+    }
+
     syncSamples();
     rebuildSchedules();
-    inspector.refresh (activeTrack(), graphView.getSelectedNode());
+    inspector.refresh (activeTrack(), editorView().getSelectedNode());
     trackList.refresh (project, active);
     graphView.repaint();
     updateTitle();
@@ -337,8 +352,14 @@ void MainComponent::addTrack()
     t.mode = activeTrack().mode;
     t.directed = activeTrack().directed;
 
+    // Close a window that is already open, keeping its track, before opening the new one.
+    if (glance != nullptr)
+        closeGlance (GlanceClose::Keep, false);
+
+    const auto returnIndex = active;
     const auto index = project.tracks.size();
     applyProjectEdit ([t] (model::Project& p) { p.tracks.push_back (t); }, index);
+    openGlance (returnIndex);
 }
 
 void MainComponent::duplicateTrack (std::size_t index)
@@ -374,6 +395,144 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     updateUndoButtons();
 }
 
+// ---------------------------------------------------------------------------
+// Floating track window
+// ---------------------------------------------------------------------------
+
+std::optional<std::size_t> MainComponent::glanceTrackIndex() const
+{
+    for (std::size_t i = 0; i < project.tracks.size(); ++i)
+        if (project.tracks[i].id == glanceTrackId)
+            return i;
+    return std::nullopt;
+}
+
+juce::Rectangle<int> MainComponent::glanceArea() const
+{
+    // Between the track list and the right panel, below the top bar and above the
+    // bottom bar; the button column sits to the right of the card.
+    const auto left = trackList.getRight() + 24;
+    const auto right = inspector.getX() - 16;
+    const auto top = topBar.getBottom() + 16;
+    const auto bottom = (statusBar.isVisible() ? statusBar.getY() : bottomBar.getY()) - 16;
+    return { left, top, std::max (200, right - left), std::max (200, bottom - top) };
+}
+
+void MainComponent::clearSelection()
+{
+    graphView.selectNode (model::noNode);
+    if (glance != nullptr)
+        glance->graph().selectNode (model::noNode);
+}
+
+void MainComponent::frameEditor()
+{
+    if (glance != nullptr)
+        glance->graph().zoomToFit (glance->graph().getLocalBounds().reduced (24));
+    else
+        graphView.zoomToFit (freeCanvasArea());
+}
+
+void MainComponent::openGlance (std::size_t returnIndex)
+{
+    graphView.selectNode (model::noNode);
+    glanceTrackId = activeTrack().id;
+    glanceReturnIndex = returnIndex;
+
+    glance = std::make_unique<TrackGlance>();
+    glance->graph().callbacks = graphView.callbacks;
+    glance->graph().onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (activeTrack(), node); };
+    glance->onClose = [this] { closeGlance (GlanceClose::Keep); };
+    glance->onExpand = [this] { closeGlance (GlanceClose::Expand); };
+    glance->onDiscard = [this] { closeGlance (GlanceClose::Discard); };
+    glance->onRename = [this] (juce::String name)
+    {
+        if (const auto index = glanceTrackIndex())
+            applyProjectEdit ([i = *index, n = name.toStdString()] (model::Project& p) { p.tracks[i].name = n; });
+    };
+
+    // Order: main canvas, dimmed layer, track window, then the floating panels on top.
+    addAndMakeVisible (*glance);
+    dimOverlay.toBehind (glance.get());
+    for (auto* c : std::initializer_list<juce::Component*> { &trackList, &inspector, &topBar, &bottomBar, &statusBar })
+        c->toFront (false);
+
+    projectChanged();   // gives the window its track
+
+    // Opens growing from the track list's "+" button, as Zen's glance grows from the link.
+    const auto target = glanceArea();
+    glance->setBounds (juce::Rectangle<int> (target.getWidth() / 3, target.getHeight() / 3)
+                           .withCentre ({ trackList.getRight(), trackList.getY() + 24 }));
+    glance->setAlpha (0.0f);
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    animator.animateComponent (glance.get(), target, 1.0f, 220, false, 0.2, 1.0);
+
+    dimOverlay.setAlpha (0.0f);
+    dimOverlay.setVisible (true);
+    animator.fadeIn (&dimOverlay, 220);
+
+    glance->graph().grabKeyboardFocus();
+}
+
+void MainComponent::closeGlance (GlanceClose how, bool animate)
+{
+    if (glance == nullptr)
+        return;
+
+    const auto index = glanceTrackIndex();
+    const auto returnIndex = std::min (glanceReturnIndex, project.tracks.size() - 1);
+
+    // Shrinks back towards the track list using a snapshot, so the window itself can
+    // be deleted right away.
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    if (animate)
+    {
+        const auto shrink = juce::Rectangle<int> (glance->getWidth() / 3, glance->getHeight() / 3)
+                                .withCentre ({ trackList.getRight(), trackList.getY() + 24 });
+        animator.animateComponent (glance.get(), shrink, 0.0f, 180, true, 1.0, 0.2);
+        animator.fadeOut (&dimOverlay, 180);
+    }
+    else
+    {
+        dimOverlay.setVisible (false);
+    }
+
+    glance->graph().selectNode (model::noNode);
+    glance.reset();
+    glanceTrackId = 0;
+
+    switch (how)
+    {
+        case GlanceClose::Keep:
+            // Back to the track that was active before; the new one keeps playing.
+            active = std::min (returnIndex, project.tracks.size() - 1);
+            projectChanged();
+            break;
+
+        case GlanceClose::Expand:
+            projectChanged();
+            if (! activeTrack().nodes.empty())
+                graphView.zoomToFit (freeCanvasArea());
+            break;
+
+        case GlanceClose::Discard:
+            if (index.has_value() && project.tracks.size() > 1)
+            {
+                const auto i = *index;
+                const auto newActive = returnIndex > i ? returnIndex - 1 : returnIndex;
+                applyProjectEdit ([i] (model::Project& p) { p.tracks.erase (p.tracks.begin() + static_cast<std::ptrdiff_t> (i)); },
+                                  std::min (newActive, project.tracks.size() - 2));
+            }
+            else
+            {
+                projectChanged();
+            }
+            break;
+    }
+
+    graphView.grabKeyboardFocus();
+}
+
 void MainComponent::rebuildSchedules()
 {
     // Each track plays in its own engine slot, with its own cycle.
@@ -403,7 +562,19 @@ void MainComponent::rebuildSchedules()
     for (auto i = static_cast<int> (project.tracks.size()); i < audio::AudioEngine::maxTracks; ++i)
         engine.publishSchedule (i, nullptr);
 
-    graphView.setTracks (std::move (views), active);
+    // The track window shows only its track, as the active one.
+    if (glance != nullptr)
+        if (const auto index = glanceTrackIndex())
+        {
+            glance->graph().setTracks ({ views[*index] }, 0);
+            const auto& t = project.tracks[*index];
+            glance->setTrackInfo (juce::String::fromUTF8 (t.name.c_str()),
+                                  juce::String::fromUTF8 (model::instrumentDisplayName (project, t.instrument).c_str()));
+        }
+
+    // Behind the track window, the main canvas keeps showing the track it was opened from.
+    const auto mainActive = glance != nullptr ? std::min (glanceReturnIndex, project.tracks.size() - 1) : active;
+    graphView.setTracks (std::move (views), mainActive);
 
     const auto status = problem.isNotEmpty() ? problem : sampleWarning.isNotEmpty() ? sampleWarning : audioWarning;
     if (status != statusLabel.getText())
@@ -438,6 +609,8 @@ void MainComponent::timerCallback()
         inspector.releasePianoKeys();
 
     graphView.setPlayhead (engine.getPositionBeats(), engine.isPlaying(), engine.getBpm());
+    if (glance != nullptr)
+        glance->graph().setPlayhead (engine.getPositionBeats(), engine.isPlaying(), engine.getBpm());
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
 
     // Frees old schedules about twice a second.
@@ -462,13 +635,25 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 
     if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
     {
-        graphView.deleteSelection();
+        editorView().deleteSelection();
         return true;
     }
 
     if (key == juce::KeyPress ('z', command, 0))
     {
         undoManager.undo();
+        return true;
+    }
+
+    if (key == juce::KeyPress::escapeKey && glance != nullptr)
+    {
+        closeGlance (GlanceClose::Keep);
+        return true;
+    }
+
+    if (key == juce::KeyPress ('r'))
+    {
+        applyRandom (randomKind);
         return true;
     }
 
@@ -538,35 +723,42 @@ void MainComponent::resized()
         projectLabel.setBounds (bar);
     }
 
-    // Bottom bar: just as wide as its content, centred at the bottom.
-    // [BPM + slider]  [stop, play, pause]  [random]  [undo, redo]
+    // Bottom bar: just as wide as its content, centred at the bottom, with the
+    // transport exactly in the middle: both side groups get the same width and the
+    // right-hand buttons are pushed to the right edge.
+    // [BPM + slider]  [stop, play, pause]  [random, options  undo, redo]
     constexpr int pad = 12;
     constexpr int groupGap = 20;
     constexpr int bpmWidth = 38 + 170;
     constexpr int transportWidth = 3 * 44;
-    constexpr int actionsWidth = 3 * 40 + 14 + 2;
-    constexpr int barWidth = pad + bpmWidth + groupGap + transportWidth + groupGap + actionsWidth + pad;
+    constexpr int actionsWidth = 4 * 40 + 2 + 14 + 2;
+    constexpr int sideWidth = std::max (bpmWidth, actionsWidth);
+    constexpr int barWidth = pad + sideWidth + groupGap + transportWidth + groupGap + sideWidth + pad;
 
     auto barArea = area.removeFromBottom (barHeight);
     bottomBar.setBounds (barArea.withSizeKeepingCentre (std::min (barWidth, barArea.getWidth()), barHeight));
     {
         auto bar = bottomBar.getLocalBounds().reduced (pad, 10);
 
-        bpmLabel.setBounds (bar.removeFromLeft (38));
-        bpmSlider.setBounds (bar.removeFromLeft (170));
-        bar.removeFromLeft (groupGap);
+        auto left = bar.removeFromLeft (sideWidth);
+        auto right = bar.removeFromRight (sideWidth);
 
-        stopButton.setBounds (bar.removeFromLeft (44));
-        playButton.setBounds (bar.removeFromLeft (44));
-        pauseButton.setBounds (bar.removeFromLeft (44));
-        bar.removeFromLeft (groupGap);
+        bpmLabel.setBounds (left.removeFromLeft (38));
+        bpmSlider.setBounds (left.removeFromLeft (170));
 
-        // Random; undo and redo together, a little further apart.
-        randomButton.setBounds (bar.removeFromLeft (40));
-        bar.removeFromLeft (14);
-        undoButton.setBounds (bar.removeFromLeft (40));
-        bar.removeFromLeft (2);
-        redoButton.setBounds (bar.removeFromLeft (40));
+        auto transport = bar.withSizeKeepingCentre (transportWidth, bar.getHeight());
+        stopButton.setBounds (transport.removeFromLeft (44));
+        playButton.setBounds (transport.removeFromLeft (44));
+        pauseButton.setBounds (transport.removeFromLeft (44));
+
+        // From the right edge: redo, undo, then options and the dice.
+        redoButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (2);
+        undoButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (14);
+        randomOptionsButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (2);
+        randomButton.setBounds (right.removeFromRight (40));
     }
 
     // Floating warning right above the bar, as long as its text.
@@ -590,6 +782,11 @@ void MainComponent::resized()
         trackList.setBounds (area.getX(), top, listWidth, listHeight);
     }
 
+    // Track window and its dimmed background.
+    dimOverlay.setBounds (getLocalBounds());
+    if (glance != nullptr && ! juce::Desktop::getInstance().getAnimator().isAnimating (glance.get()))
+        glance->setBounds (glanceArea());
+
     // The first time, the graph is framed in the space the panels leave free.
     if (! initialFitDone && getWidth() > 0 && getHeight() > 0)
     {
@@ -609,69 +806,103 @@ void MainComponent::resized()
 // Random
 // ---------------------------------------------------------------------------
 
-void MainComponent::showRandomMenu()
+juce::String MainComponent::randomKindName (RandomKind kind)
 {
-    enum Item { graph = 1, notes, rhythm, instruments, algorithm, everything, everythingAllTracks };
+    switch (kind)
+    {
+        case RandomKind::Graph:               return "New graph";
+        case RandomKind::Notes:               return "Notes (same shape)";
+        case RandomKind::Rhythm:              return "Rhythm: durations and velocities";
+        case RandomKind::Instruments:         return "Instruments";
+        case RandomKind::Algorithm:           return "Algorithm: tree, traversal, siblings";
+        case RandomKind::Everything:          return "Everything";
+        case RandomKind::EverythingAllTracks: return "Everything, on every track";
+    }
+    return {};
+}
 
+void MainComponent::updateRandomTooltip()
+{
+    randomButton.setTooltip ("Random: " + randomKindName (randomKind).toLowerCase() + juce::String (" (R)"));
+}
+
+void MainComponent::showRandomOptions()
+{
     const bool algorithmMode = activeTrack().mode == model::PlaybackMode::Algorithm;
     const bool empty = activeTrack().nodes.empty();
 
+    // The chosen option is applied right away and becomes what the dice does.
     juce::PopupMenu menu;
-    menu.addSectionHeader ("Random, on the active track");
-    menu.addItem (graph, "New graph");
-    menu.addItem (notes, "Notes (same shape)", ! empty);
-    menu.addItem (rhythm, "Rhythm: durations and velocities", ! empty);
-    menu.addItem (instruments, "Instruments");
-    menu.addItem (algorithm, algorithmMode ? "Algorithm: tree, traversal, siblings"
-                                           : "Algorithm (algorithm mode only)", algorithmMode);
-    menu.addItem (everything, "Everything");
+    menu.addSectionHeader ("The dice randomizes, on the active track:");
+    const auto add = [&] (RandomKind kind, bool enabled, const juce::String& label)
+    {
+        menu.addItem (static_cast<int> (kind) + 1, label, enabled, randomKind == kind);
+    };
+    add (RandomKind::Graph, true, randomKindName (RandomKind::Graph));
+    add (RandomKind::Notes, ! empty, randomKindName (RandomKind::Notes));
+    add (RandomKind::Rhythm, ! empty, randomKindName (RandomKind::Rhythm));
+    add (RandomKind::Instruments, true, randomKindName (RandomKind::Instruments));
+    add (RandomKind::Algorithm, algorithmMode, algorithmMode ? randomKindName (RandomKind::Algorithm)
+                                                             : juce::String ("Algorithm (algorithm mode only)"));
+    add (RandomKind::Everything, true, randomKindName (RandomKind::Everything));
     menu.addSeparator();
-    menu.addItem (everythingAllTracks, "Everything, on every track");
+    add (RandomKind::EverythingAllTracks, true, randomKindName (RandomKind::EverythingAllTracks));
 
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&randomButton),
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&randomOptionsButton),
                         [safe = juce::Component::SafePointer<MainComponent> (this)] (int result)
     {
         if (safe == nullptr || result == 0)
             return;
 
-        auto& self = *safe;
-        const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
-
-        // Possible instruments: the built-ins and the samples that loaded.
-        std::vector<model::InstrumentId> available;
-        for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-            available.push_back (static_cast<model::InstrumentId> (id));
-        for (const auto& smp : self.project.samples)
-            if (self.decodedSamples.count (smp.path) > 0)
-                available.push_back (smp.id);
-
-        const bool newShape = result == graph || result == everything || result == everythingAllTracks;
-        if (newShape)
-            self.graphView.selectNode (model::noNode);
-
-        switch (result)
-        {
-            case graph:       self.applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); }); break;
-            case notes:       self.applyEdit ([seed] (model::Track& t) { model::randomizeNotes (t, seed); }); break;
-            case rhythm:      self.applyEdit ([seed] (model::Track& t) { model::randomizeRhythm (t, seed); }); break;
-            case instruments: self.applyEdit ([seed, available] (model::Track& t) { model::randomizeInstruments (t, seed, available); }); break;
-            case algorithm:   self.applyEdit ([seed] (model::Track& t) { model::randomizeAlgorithm (t, seed); }); break;
-            case everything:  self.applyEdit ([seed, available] (model::Track& t) { model::randomizeEverything (t, seed, available); }); break;
-            case everythingAllTracks:
-                // A single undo step for every track; each with its own seed.
-                self.applyProjectEdit ([seed, available] (model::Project& p)
-                {
-                    for (std::size_t i = 0; i < p.tracks.size(); ++i)
-                        model::randomizeEverything (p.tracks[i], seed + static_cast<std::uint32_t> (i) * 7919u, available);
-                });
-                break;
-            default: break;
-        }
-
-        // A new shape is framed in the part of the canvas the panels do not cover.
-        if (newShape)
-            self.graphView.zoomToFit (self.freeCanvasArea());
+        safe->randomKind = static_cast<RandomKind> (result - 1);
+        safe->updateRandomTooltip();
+        safe->applyRandom (safe->randomKind);
     });
+}
+
+void MainComponent::applyRandom (RandomKind kind)
+{
+    // Options that need notes or algorithm mode fall back to a new graph.
+    if ((kind == RandomKind::Notes || kind == RandomKind::Rhythm) && activeTrack().nodes.empty())
+        kind = RandomKind::Graph;
+    if (kind == RandomKind::Algorithm && activeTrack().mode != model::PlaybackMode::Algorithm)
+        kind = RandomKind::Graph;
+
+    const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
+
+    // Possible instruments: the built-ins and the samples that loaded.
+    std::vector<model::InstrumentId> available;
+    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+        available.push_back (static_cast<model::InstrumentId> (id));
+    for (const auto& smp : project.samples)
+        if (decodedSamples.count (smp.path) > 0)
+            available.push_back (smp.id);
+
+    const bool newShape = kind == RandomKind::Graph || kind == RandomKind::Everything || kind == RandomKind::EverythingAllTracks;
+    if (newShape)
+        clearSelection();
+
+    switch (kind)
+    {
+        case RandomKind::Graph:       applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); }); break;
+        case RandomKind::Notes:       applyEdit ([seed] (model::Track& t) { model::randomizeNotes (t, seed); }); break;
+        case RandomKind::Rhythm:      applyEdit ([seed] (model::Track& t) { model::randomizeRhythm (t, seed); }); break;
+        case RandomKind::Instruments: applyEdit ([seed, available] (model::Track& t) { model::randomizeInstruments (t, seed, available); }); break;
+        case RandomKind::Algorithm:   applyEdit ([seed] (model::Track& t) { model::randomizeAlgorithm (t, seed); }); break;
+        case RandomKind::Everything:  applyEdit ([seed, available] (model::Track& t) { model::randomizeEverything (t, seed, available); }); break;
+        case RandomKind::EverythingAllTracks:
+            // A single undo step for every track; each with its own seed.
+            applyProjectEdit ([seed, available] (model::Project& p)
+            {
+                for (std::size_t i = 0; i < p.tracks.size(); ++i)
+                    model::randomizeEverything (p.tracks[i], seed + static_cast<std::uint32_t> (i) * 7919u, available);
+            });
+            break;
+    }
+
+    // A new shape is framed in the canvas being edited (the track window, if open).
+    if (newShape)
+        frameEditor();
 }
 
 // ---------------------------------------------------------------------------
@@ -923,7 +1154,7 @@ void MainComponent::syncSamples()
 
 void MainComponent::loadSample (bool forNode)
 {
-    const auto node = graphView.getSelectedNode();
+    const auto node = editorView().getSelectedNode();
     const auto trackIndex = active;
 
     fileChooser = std::make_unique<juce::FileChooser> ("Load sound sample", defaultFolder(),
@@ -1110,7 +1341,8 @@ void MainComponent::newProject()
     {
         // New document: a single empty track, with the active track's options.
         engine.stop();
-        graphView.selectNode (model::noNode);
+        closeGlance (GlanceClose::Keep, false);
+        clearSelection();
 
         auto empty = activeTrack();
         empty.id = 1;
@@ -1174,7 +1406,8 @@ void MainComponent::openFile (const juce::File& file)
     }
 
     engine.stop();
-    graphView.selectNode (model::noNode);
+    closeGlance (GlanceClose::Keep, false);
+    clearSelection();
     undoManager.clearUndoHistory();
 
     // Sample paths relative to the project folder → absolute.

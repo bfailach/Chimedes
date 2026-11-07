@@ -62,6 +62,9 @@ public:
     // (in this component's coordinates), without zooming in past 100 %.
     void zoomToFit (juce::Rectangle<int> visibleArea);
 
+    // Rounds the bottom corners (for the canvas inside a floating track window).
+    void setBottomCornerRadius (float radius);
+
     model::NodeId getSelectedNode() const noexcept;
     void selectNode (model::NodeId node);
     void deleteSelection();
@@ -148,6 +151,8 @@ private:
     double playheadMs = 0.0;        // when `playheadBeat` arrived
     double currentBpm = 120.0;
     bool playing = false;
+
+    float bottomCornerRadius = 0.0f;
 
     juce::VBlankAttachment vblank { this, [this] { onFrame(); } };
 

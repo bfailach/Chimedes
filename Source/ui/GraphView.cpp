@@ -568,9 +568,25 @@ float GraphView::starRadius (const model::Node& node) const noexcept
     return base * juce::jlimit (0.75f, 1.4f, std::sqrt (zoom));
 }
 
+void GraphView::setBottomCornerRadius (float radius)
+{
+    bottomCornerRadius = radius;
+    setOpaque (radius <= 0.0f);
+    repaint();
+}
+
 void GraphView::paint (juce::Graphics& g)
 {
     const auto now = nowMs();
+
+    if (bottomCornerRadius > 0.0f)
+    {
+        juce::Path shape;
+        const auto b = getLocalBounds().toFloat();
+        shape.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(),
+                                   bottomCornerRadius, bottomCornerRadius, false, false, true, true);
+        g.reduceClipRegion (shape);
+    }
 
     paintSky (g);
 

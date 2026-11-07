@@ -34,7 +34,7 @@ Phase 4 done:
 
 ## Usage
 
-The app opens with a demo graph; the **New** button (sheet icon) starts an empty one. The canvas fills the whole window, with floating panels: tracks on the left, file actions at the top, properties on the right and the transport at the bottom.
+The app opens with a demo graph; the **New** button (sheet icon) starts an empty one. The canvas fills the whole window, with floating panels: tracks on the left, file actions at the top, properties on the right and the transport at the bottom, with play, stop and pause in the middle of the bar.
 
 | Action | How |
 | --- | --- |
@@ -50,7 +50,8 @@ The app opens with a demo graph; the **New** button (sheet icon) starts an empty
 | Save the note or chord | **Enter** (Esc discards the proposal) |
 | New, open, save | Sheet, folder and floppy-disk icons in the top bar (next to the project name), or **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Shift+S**: save as). Before closing, opening another project or starting a new one, the app asks if there are unsaved changes |
 | Tracks | Left panel: a click makes a track active (the one you edit; the others are dimmed and keep playing), a double-click renames it, the speaker mutes it, **+** adds one (up to 16) and a right-click duplicates or deletes. Clicking a dimmed star also activates its track. Everything can be undone |
-| Random | **Random** button (dice icon): a menu to randomize the graph, notes, rhythm, instruments or algorithm of the active track, everything at once, or everything on every track. Can be undone |
+| New track window | **+** opens the new track in a floating window inside the app (like Zen Browser's Glance), over the dimmed canvas. Edit it there with the right panel and the transport as usual. Buttons beside it: **close** (Esc or a click outside; the track stays and you go back), **expand** (it becomes the active track on the main canvas) and **discard** (deletes it; can be undone) |
+| Random | **Dice** (or **R**): randomizes the active track right away. **Options** (sliders icon): choose what the dice randomizes (graph, notes, rhythm, instruments, algorithm, everything, or everything on every track); the choice is applied at once and the dice remembers it. Can be undone |
 | Export | Tray icon in the top bar: **WAV** (audio, 48 kHz, 24-bit) or **MIDI**, choosing the length |
 | Zoom | Mouse wheel |
 | Pan | Drag on empty space, or with the middle button |
@@ -93,7 +94,7 @@ The project stores the file's path, not the audio. If the sample is inside the p
 
 ## Random
 
-The dice opens a menu. Everything applies to the active track, except the last option, and can be undone:
+The dice randomizes right away; the options button next to it chooses what the dice does (by default, a new graph). Choosing an option also applies it. Everything applies to the active track, except the last option, and can be undone:
 
 - **New graph**: see below.
 - **Notes**: same shape, new scale and key; the melody follows the edges from the start and the end goes back to the tonic.

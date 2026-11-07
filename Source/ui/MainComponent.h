@@ -13,6 +13,7 @@
 #include "ui/GraphView.h"
 #include "ui/IconButton.h"
 #include "ui/Inspector.h"
+#include "ui/TrackGlance.h"
 #include "ui/TrackList.h"
 #include "ui/TransportButton.h"
 
@@ -67,11 +68,29 @@ private:
     const model::Track& activeTrack() const noexcept { return project.tracks[active]; }
 
     void addTrack();
+
+    // Floating track window (Zen-style "glance"). It opens when a track is added.
+    enum class GlanceClose { Keep, Expand, Discard };
+    void openGlance (std::size_t returnIndex);
+    void closeGlance (GlanceClose how, bool animate = true);
+    std::optional<std::size_t> glanceTrackIndex() const;
+    juce::Rectangle<int> glanceArea() const;
+
+    // The canvas being edited: the track window's when it is open, otherwise the main one.
+    GraphView& editorView() noexcept { return glance != nullptr ? glance->graph() : graphView; }
+    void clearSelection();
+    void frameEditor();   // zoom so the edited track fits
     void duplicateTrack (std::size_t index);
     void deleteTrack (std::size_t index);
 
     void rebuildSchedules();
-    void showRandomMenu();
+    // Random: the dice applies `randomKind`; the options button chooses it.
+    enum class RandomKind { Graph, Notes, Rhythm, Instruments, Algorithm, Everything, EverythingAllTracks };
+    static juce::String randomKindName (RandomKind kind);
+    void applyRandom (RandomKind kind);
+    void showRandomOptions();
+    void updateRandomTooltip();
+    RandomKind randomKind = RandomKind::Graph;
 
     // Export
     enum class ExportKind { Wav, Midi };
@@ -144,6 +163,7 @@ private:
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
     IconButton randomButton { "Random", IconButton::Icon::Random };
+    IconButton randomOptionsButton { "Random options", IconButton::Icon::Options };
     IconButton newButton { "New (Ctrl+N)", IconButton::Icon::New };
     IconButton openButton { "Open (Ctrl+O)", IconButton::Icon::Open };
     IconButton saveButton { "Save (Ctrl+S)", IconButton::Icon::Save };
@@ -155,6 +175,10 @@ private:
     GraphView graphView;
     Inspector inspector;
     TrackList trackList;
+    DimOverlay dimOverlay;
+    std::unique_ptr<TrackGlance> glance;
+    model::TrackId glanceTrackId = 0;
+    std::size_t glanceReturnIndex = 0;
     juce::TooltipWindow tooltips { this, 600 };
 
     juce::String audioWarning;

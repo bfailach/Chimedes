@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "ui/Theme.h"
@@ -7,13 +9,14 @@
 namespace chimedes::ui
 {
 
-// Action button drawn as a stroke icon: random (dice), new (sheet), open (folder),
-// save (floppy disk), export (tray), undo and redo (curved arrow), add (plus). The
+// Action button drawn as a stroke icon: random (dice), options (sliders), new
+// (sheet), open (folder), save (floppy disk), export (tray), undo and redo (curved
+// arrow), add (plus), close (cross), expand (diagonal arrows) and delete (bin). The
 // name is shown as a tooltip.
 class IconButton : public juce::Button
 {
 public:
-    enum class Icon { Random, New, Open, Save, Export, Undo, Redo, Add };
+    enum class Icon { Random, Options, New, Open, Save, Export, Undo, Redo, Add, Close, Expand, Delete };
 
     IconButton (const juce::String& name, Icon iconToUse)
         : juce::Button (name), icon (iconToUse)
@@ -98,6 +101,77 @@ public:
                 tray.lineTo (x + 9.0f, y + 2.0f);
                 tray.lineTo (x + 13.0f, y + 6.0f);
                 g.strokePath (tray, stroke);
+                break;
+            }
+
+            case Icon::Options:
+            {
+                // Three sliders with their knobs at different heights.
+                juce::Path lines;
+                for (const auto lx : { 4.0f, 9.0f, 14.0f })
+                {
+                    lines.startNewSubPath (x + lx, y + 2.0f);
+                    lines.lineTo (x + lx, y + 16.0f);
+                }
+                g.strokePath (lines, stroke);
+                for (const auto& [kx, ky] : { std::pair { 4.0f, 11.5f }, std::pair { 9.0f, 5.5f }, std::pair { 14.0f, 9.5f } })
+                {
+                    g.setColour (theme::panel);
+                    g.fillEllipse (x + kx - 2.6f, y + ky - 2.6f, 5.2f, 5.2f);
+                    g.setColour (colour);
+                    g.drawEllipse (x + kx - 2.6f, y + ky - 2.6f, 5.2f, 5.2f, 1.5f);
+                }
+                break;
+            }
+
+            case Icon::Close:
+            {
+                juce::Path cross;
+                cross.startNewSubPath (x + 4.0f, y + 4.0f);
+                cross.lineTo (x + 14.0f, y + 14.0f);
+                cross.startNewSubPath (x + 14.0f, y + 4.0f);
+                cross.lineTo (x + 4.0f, y + 14.0f);
+                g.strokePath (cross, stroke);
+                break;
+            }
+
+            case Icon::Expand:
+            {
+                // Two arrows pointing to opposite corners.
+                juce::Path arrows;
+                arrows.startNewSubPath (x + 10.5f, y + 2.5f);
+                arrows.lineTo (x + 15.5f, y + 2.5f);
+                arrows.lineTo (x + 15.5f, y + 7.5f);
+                arrows.startNewSubPath (x + 15.5f, y + 2.5f);
+                arrows.lineTo (x + 10.0f, y + 8.0f);
+                arrows.startNewSubPath (x + 7.5f, y + 15.5f);
+                arrows.lineTo (x + 2.5f, y + 15.5f);
+                arrows.lineTo (x + 2.5f, y + 10.5f);
+                arrows.startNewSubPath (x + 2.5f, y + 15.5f);
+                arrows.lineTo (x + 8.0f, y + 10.0f);
+                g.strokePath (arrows, stroke);
+                break;
+            }
+
+            case Icon::Delete:
+            {
+                // A bin with a lid.
+                juce::Path bin;
+                bin.startNewSubPath (x + 2.5f, y + 4.5f);
+                bin.lineTo (x + 15.5f, y + 4.5f);
+                bin.startNewSubPath (x + 7.0f, y + 4.5f);
+                bin.lineTo (x + 7.5f, y + 2.0f);
+                bin.lineTo (x + 10.5f, y + 2.0f);
+                bin.lineTo (x + 11.0f, y + 4.5f);
+                bin.startNewSubPath (x + 4.0f, y + 4.5f);
+                bin.lineTo (x + 5.0f, y + 16.0f);
+                bin.lineTo (x + 13.0f, y + 16.0f);
+                bin.lineTo (x + 14.0f, y + 4.5f);
+                bin.startNewSubPath (x + 7.5f, y + 7.5f);
+                bin.lineTo (x + 7.5f, y + 13.0f);
+                bin.startNewSubPath (x + 10.5f, y + 7.5f);
+                bin.lineTo (x + 10.5f, y + 13.0f);
+                g.strokePath (bin, stroke);
                 break;
             }
 
