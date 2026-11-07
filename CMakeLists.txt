@@ -89,13 +89,15 @@ if(CHIMEDES_BUILD_APP)
         Source/ui/WindowStyle.cpp
     )
 
-    # Theme fonts (Space Grotesk and JetBrains Mono, SIL OFL license).
-    juce_add_binary_data(ChimedesFonts
+    # Theme fonts (Space Grotesk and JetBrains Mono, SIL OFL license) and the
+    # window icon used where the platform does not take it from the executable.
+    juce_add_binary_data(ChimedesResources
         HEADER_NAME BinaryData.h
         NAMESPACE BinaryData
         SOURCES
             Resources/Fonts/SpaceGrotesk.ttf
             Resources/Fonts/JetBrainsMono.ttf
+            Resources/Logo/chimedes-icon-256.png
     )
 
     target_compile_definitions(Chimedes PRIVATE
@@ -108,7 +110,7 @@ if(CHIMEDES_BUILD_APP)
     target_link_libraries(Chimedes
         PRIVATE
             chimedes_core
-            ChimedesFonts
+            ChimedesResources
             juce::juce_gui_extra
             juce::juce_audio_utils
         PUBLIC

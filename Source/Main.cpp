@@ -1,5 +1,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include "BinaryData.h"
+
 #include "ui/ChimedesLookAndFeel.h"
 #include "ui/MainComponent.h"
 #include "ui/Theme.h"
@@ -59,6 +61,14 @@ private:
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
             chimedes::ui::applyDarkTitleBar (*this);  // after setVisible: needs the native window
+
+           #if JUCE_LINUX || JUCE_BSD
+            // Windows and macOS take the icon from the executable or the app bundle;
+            // on Linux the window needs it set by hand.
+            if (auto* peer = getPeer())
+                peer->setIcon (juce::ImageCache::getFromMemory (BinaryData::chimedesicon256_png,
+                                                                BinaryData::chimedesicon256_pngSize));
+           #endif
         }
 
         void closeButtonPressed() override
