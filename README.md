@@ -52,7 +52,7 @@ The app opens with a demo graph; the **New** button (sheet icon) starts an empty
 | Delete | Delete or Backspace, with something selected |
 | Start and end | Right-click a node, or the buttons in the right panel |
 | Node notes | Keyboard in the right panel: a click proposes a note and plays it, Shift+click builds chords; `<` `>` change octave. The proposal gets a white outline and is saved with Enter |
-| Instrument | Right panel: one for the track and, if you like, another for each node |
+| Instrument | Right panel: the track's in an always-open list with an icon per instrument (it uses the panel's free space and scrolls; it shrinks while a node is being edited), and, if you like, another for each node in its drop-down |
 | Try notes | Click the panel's keyboard or press **A W S E D F T G Y H U J K O L P** (from C to the D♯ of the next octave, starting at the first visible C). They sound right away. Several letters at once, or Shift, make a chord; **Z / X** change octave |
 | Save the note or chord | **Enter** (Esc discards the proposal) |
 | New, open, save | Sheet, folder and floppy-disk icons in the top bar (next to the project name), or **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Shift+S**: save as). Before closing, opening another project or starting a new one, the app asks if there are unsaved changes |
@@ -91,7 +91,7 @@ When opening, missing fields take their default value, out-of-range values are c
 
 ## Instruments
 
-22 synthesized instruments, with no audio files, grouped in the drop-downs by family:
+22 synthesized instruments, with no audio files, grouped by family in the track's list and the node's drop-down:
 
 | Family | Instruments | How they are made |
 |---|---|---|
@@ -108,7 +108,7 @@ Projects made before keep their instruments: ids 1 to 6 are the original six and
 
 ### Your own samples
 
-In the instrument drop-down (of the track or of a node), **Load sample…** opens a WAV, AIFF, FLAC or OGG file (up to 30 seconds) and uses it as an instrument: the sample is taken as recorded at middle C (C4) and transposed for each note. A project holds up to ten samples; when there is no room, the ones nobody uses are removed. Loading the same file again reuses the sample.
+At the end of the track's instrument list, or in a node's drop-down, **Load sample…** opens a WAV, AIFF, FLAC or OGG file (up to 30 seconds) and uses it as an instrument: the sample is taken as recorded at middle C (C4) and transposed for each note. A project holds up to ten samples; when there is no room, the ones nobody uses are removed. Loading the same file again reuses the sample.
 
 The project stores the file's path, not the audio. If the sample is inside the project folder, the path is saved as relative, so the whole folder can be moved or shared. If a file is missing when opening, a warning appears and that sample stays silent; the rest of the project plays normally.
 

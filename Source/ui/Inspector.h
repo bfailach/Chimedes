@@ -8,6 +8,7 @@
 
 #include "model/Track.h"
 #include "ui/EditCallbacks.h"
+#include "ui/InstrumentList.h"
 #include "ui/PianoPicker.h"
 
 namespace chimedes::ui
@@ -26,7 +27,7 @@ public:
     // Shows the track and the selected node again (noNode = none).
     void refresh (const model::Track& track, model::NodeId selectedNode);
 
-    // Height it needs to show all of its content.
+    // Height it needs to show all of its content (the instrument list fully open).
     int getIdealHeight() const;
 
     // Keyboard preview notes: velocity 0 = off. The instrument is already
@@ -37,7 +38,7 @@ public:
     // `canLoadMore` enables "Load sample…" (there are ten at most).
     void setSampleChoices (std::vector<std::pair<model::InstrumentId, juce::String>> samples, bool canLoadMore);
 
-    // "Load sample…" in the track's drop-down (false) or the node's (true).
+    // "Load sample…" in the track's instrument list (false) or the node's drop-down (true).
     std::function<void (bool forNode)> onLoadSample;
 
     // Computer keyboard for the piano (only with a node selected).
@@ -49,7 +50,10 @@ public:
     void resized() override;
 
 private:
-    int layout (bool apply);  // places the controls (if apply) and returns the total height
+    // Places the controls (if apply) and returns the height without the
+    // instrument list, which takes whatever is left (`listHeight`).
+    int layout (bool apply, int listHeight);
+    int fixedHeight() const;
     void editNode (const std::function<void (model::Node&)>& change);
     void updateNotesDisplay();
     void rebuildInstrumentBoxes();
@@ -61,13 +65,15 @@ private:
 
     std::vector<std::pair<model::InstrumentId, juce::String>> sampleChoices;
     bool canLoadSample = true;
-    int trackInstrumentItem = 1;   // the chosen one, to go back to it after "Load sample…"
-    int nodeInstrumentItem = 1;
+    int nodeInstrumentItem = 1;   // the chosen one, to go back to it after "Load sample…"
 
     // Track
     juce::Label trackHeader;
-    juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox, quantizeBox, trackInstrumentBox;
+    juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox, quantizeBox;
     juce::ToggleButton directedToggle;
+    juce::Label trackInstrumentLabel;
+    InstrumentList instrumentList;
+    juce::Viewport instrumentViewport;
 
     // Node
     juce::Label nodeHeader, notesLabel, notesValue, notesHint, instrumentLabel, durationLabel, velocityLabel;

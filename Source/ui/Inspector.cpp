@@ -83,19 +83,21 @@ Inspector::Inspector()
         const auto step = quantizeSteps[static_cast<std::size_t> (std::max (0, quantizeBox.getSelectedItemIndex()))];
         callbacks.edit ([step] (model::Track& t) { t.quantizeBeats = step; });
     };
-    trackInstrumentBox.onChange = [this]
+    // The track's instrument: an always-open list with icons, in the space left over.
+    styleCaption (trackInstrumentLabel, "Instrument");
+    instrumentList.onSelect = [this] (model::InstrumentId id)
     {
-        if (trackInstrumentBox.getSelectedId() == loadSampleItem)
-        {
-            trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
-            if (onLoadSample)
-                onLoadSample (false);
-            return;
-        }
-
-        const auto id = static_cast<model::InstrumentId> (trackInstrumentBox.getSelectedId());
         callbacks.edit ([id] (model::Track& t) { t.instrument = id; });
     };
+    instrumentList.onLoadSample = [this]
+    {
+        if (onLoadSample)
+            onLoadSample (false);
+    };
+    instrumentViewport.setViewedComponent (&instrumentList, false);
+    instrumentViewport.setScrollBarsShown (true, false);
+    instrumentViewport.setScrollBarThickness (6);
+    instrumentViewport.getVerticalScrollBar().setColour (juce::ScrollBar::thumbColourId, theme::controlPressed);
     directedToggle.onClick = [this]
     {
         const auto directed = directedToggle.getToggleState();
@@ -173,8 +175,8 @@ Inspector::Inspector()
     };
 
     for (auto* c : std::initializer_list<juce::Component*> {
-             &trackHeader, &modeBox, &treeBox, &traversalBox, &siblingsBox, &quantizeBox, &trackInstrumentBox,
-             &directedToggle, &nodeHeader, &notesLabel, &notesValue, &piano, &notesHint, &instrumentLabel,
+             &trackHeader, &modeBox, &treeBox, &traversalBox, &siblingsBox, &quantizeBox,
+             &directedToggle, &trackInstrumentLabel, &instrumentViewport, &nodeHeader, &notesLabel, &notesValue, &piano, &notesHint, &instrumentLabel,
              &nodeInstrumentBox, &durationLabel, &durationSlider, &velocityLabel, &velocitySlider,
              &startButton, &endButton, &deleteButton, &noSelectionLabel })
         addAndMakeVisible (c);
@@ -220,9 +222,20 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     traversalBox.setSelectedItemIndex (static_cast<int> (track.traversal), juce::dontSendNotification);
     siblingsBox.setSelectedItemIndex (static_cast<int> (track.siblings), juce::dontSendNotification);
     quantizeBox.setSelectedItemIndex (quantizeIndex (track.quantizeBeats), juce::dontSendNotification);
-    trackInstrumentItem = static_cast<int> (model::instruments::isValid (track.instrument) ? track.instrument
-                                                                                          : model::instruments::organ);
-    trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
+    {
+        const auto instrument = model::instruments::isValid (track.instrument) ? track.instrument : model::instruments::organ;
+        if (instrument != instrumentList.getSelected())
+        {
+            instrumentList.setSelected (instrument);
+
+            // Changed from elsewhere (undo, the dice, another track): bring it into view.
+            const auto row = instrumentList.rowRange (instrument);
+            const auto top = instrumentViewport.getViewPositionY();
+            const auto visible = instrumentViewport.getMaximumVisibleHeight();
+            if (! row.isEmpty() && (row.getStart() < top || row.getEnd() > top + visible))
+                instrumentViewport.setViewPosition (0, std::max (0, row.getStart() - (visible - row.getLength()) / 2));
+        }
+    }
     directedToggle.setToggleState (track.directed, juce::dontSendNotification);
 
     // Algorithm options do not apply in timeline mode.
@@ -239,6 +252,7 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
         piano.releaseAllKeys();
         piano.discardPending();
     }
+    const bool selectionShown = node != model::noNode;
     node = newNode;
 
     for (auto* c : std::initializer_list<juce::Component*> {
@@ -247,6 +261,10 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
         c->setVisible (n != nullptr);
 
     noSelectionLabel.setVisible (n == nullptr);
+
+    // The node section grows or shrinks: the instrument list gets what is left.
+    if (selectionShown != (n != nullptr))
+        resized();
 
     if (n == nullptr)
         return;
@@ -272,17 +290,23 @@ void Inspector::paint (juce::Graphics& g)
     g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), theme::cornerRadius, 1.0f);
 }
 
+int Inspector::fixedHeight() const
+{
+    return const_cast<Inspector*> (this)->layout (false, 0);
+}
+
 int Inspector::getIdealHeight() const
 {
-    return const_cast<Inspector*> (this)->layout (false);
+    return fixedHeight() + instrumentList.getContentHeight();
 }
 
 void Inspector::resized()
 {
-    layout (true);
+    constexpr int minimumList = 3 * InstrumentList::rowHeight;
+    layout (true, std::max (minimumList, getHeight() - fixedHeight()));
 }
 
-int Inspector::layout (bool apply)
+int Inspector::layout (bool apply, int listHeight)
 {
     // A single routine places the controls and measures the height, so they never drift apart.
     constexpr int padX = 14, padY = 12, rowH = 28;
@@ -302,12 +326,25 @@ int Inspector::layout (bool apply)
     place (traversalBox, rowH);
     place (siblingsBox, rowH);
     place (quantizeBox, rowH);
-    place (trackInstrumentBox, rowH);
-    place (directedToggle, 22, 14);
+    place (directedToggle, 22, 8);
+
+    place (trackInstrumentLabel, 16, 2);
+    if (apply)
+    {
+        instrumentViewport.setBounds (padX - 4, y, width + 8, listHeight);
+        instrumentList.setSize (instrumentViewport.getMaximumVisibleWidth()
+                                    - (instrumentList.getContentHeight() > listHeight ? 8 : 0),
+                                instrumentList.getContentHeight());
+    }
+    y += listHeight + 14;
 
     place (nodeHeader, 22);
     if (apply)
         noSelectionLabel.setBounds (padX, y, width, 22);
+
+    // With no node selected, the section is only that line.
+    if (node == model::noNode)
+        return y + 22 + padY;
 
     if (apply)
     {
@@ -372,12 +409,14 @@ void Inspector::setSampleChoices (std::vector<std::pair<model::InstrumentId, juc
     sampleChoices = std::move (samples);
     canLoadSample = canLoadMore;
     rebuildInstrumentBoxes();
+    resized();   // the list's height changed
 }
 
 void Inspector::rebuildInstrumentBoxes()
 {
-    // Built-ins, then the project's samples and finally "Load sample…".
-    trackInstrumentBox.clear (juce::dontSendNotification);
+    // The track's list, then the node's drop-down: built-ins, the project's
+    // samples and finally "Load sample…".
+    instrumentList.setSamples (sampleChoices, canLoadSample);
     nodeInstrumentBox.clear (juce::dontSendNotification);
     nodeInstrumentBox.addItem ("Same as track", nodeUsesTrackItem);
 
@@ -386,7 +425,6 @@ void Inspector::rebuildInstrumentBoxes()
     {
         const auto category = static_cast<model::instruments::Category> (c);
         const auto heading = text (model::instruments::categoryNames[c]);
-        trackInstrumentBox.addSectionHeading (heading);
         nodeInstrumentBox.addSectionHeading (heading);
 
         for (const auto& info : model::instruments::builtIns)
@@ -396,32 +434,25 @@ void Inspector::rebuildInstrumentBoxes()
 
             const auto id = static_cast<int> (info.id);
             const auto name = text (info.name);
-            trackInstrumentBox.addItem ("Instrument: " + name, id);
             nodeInstrumentBox.addItem (name, id + 1);
         }
     }
 
     if (! sampleChoices.empty())
     {
-        trackInstrumentBox.addSeparator();
         nodeInstrumentBox.addSeparator();
 
         for (const auto& [id, name] : sampleChoices)
         {
-            trackInstrumentBox.addItem ("Instrument: " + name, static_cast<int> (id));
             nodeInstrumentBox.addItem (name, static_cast<int> (id) + 1);
         }
     }
 
     const auto loadText = canLoadSample ? text ("Load sample…") : text ("Load sample… (10 max)");
-    trackInstrumentBox.addSeparator();
     nodeInstrumentBox.addSeparator();
-    trackInstrumentBox.addItem (loadText, loadSampleItem);
     nodeInstrumentBox.addItem (loadText, loadSampleItem);
-    trackInstrumentBox.setItemEnabled (loadSampleItem, canLoadSample);
     nodeInstrumentBox.setItemEnabled (loadSampleItem, canLoadSample);
 
-    trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
     nodeInstrumentBox.setSelectedId (nodeInstrumentItem, juce::dontSendNotification);
 }
 

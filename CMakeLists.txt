@@ -81,6 +81,7 @@ if(CHIMEDES_BUILD_APP)
         Source/ui/Fonts.cpp
         Source/ui/GraphView.cpp
         Source/ui/Inspector.cpp
+        Source/ui/InstrumentList.cpp
         Source/ui/MainComponent.cpp
         Source/ui/PianoPicker.cpp
         Source/ui/TrackList.cpp
