@@ -6,6 +6,10 @@ All notable changes to Chimedes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The app now opens with *Carousel*, an original waltz for kalimba drawn as a ring of stars that rise and fall with the melody.
+
 ## [0.1.0] - 2026-11-07
 
 First public release, with a ready-to-run Windows build.

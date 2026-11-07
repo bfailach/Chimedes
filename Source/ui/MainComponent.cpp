@@ -73,9 +73,7 @@ namespace
     model::Project makeDemoProject()
     {
         model::Project p;
-        auto demo = model::makeDemoTrack();
-        demo.name = "Track 1";
-        p.tracks = { demo };
+        p.tracks = { model::makeCarouselTrack() };
         return p;
     }
 

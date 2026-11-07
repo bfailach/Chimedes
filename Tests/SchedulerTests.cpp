@@ -344,3 +344,24 @@ TEST ("timeline: the source is the connected neighbour that sounded just before"
     CHECK (eventOf (s, 3)->from == 2);
     CHECK (eventOf (s, 4)->from == 3);   // 3 sounded after 1
 }
+
+TEST ("carousel demo: one note per beat around the ring, 16 bars of 3/4")
+{
+    const auto t = model::makeCarouselTrack();
+    const auto result = engine::buildSchedule (t);
+    REQUIRE (result.ok());
+    const auto& s = *result.schedule;
+
+    CHECK (s.events.size() == 48);
+    CHECK_NEAR (s.cycleLengthBeats, 48.0);
+
+    for (const auto& n : t.nodes)
+        CHECK_NEAR (eventOf (s, n.id)->startBeat, static_cast<double> (n.id - 1));
+
+    // The bumps of the ring stay well inside one beat, so snapping is safe.
+    for (const auto& e : t.edges)
+    {
+        CHECK (t.edgeLength (e) > 70.0);
+        CHECK (t.edgeLength (e) < 130.0);
+    }
+}

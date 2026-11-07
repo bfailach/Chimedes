@@ -2,7 +2,7 @@
 // using the same audio engine as the application. Useful to check the audio on
 // machines without speakers.
 //
-// Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument id] [bpm]
+// Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs|carousel] [cycles] [instrument id] [bpm]
 //        ChimedesRender <output.wav> <project.chimedes> [loops, 0 = full]
 //
 // The second form uses exactly the same export as the app (Export audio).
@@ -24,7 +24,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument id] [bpm]\n";
+        std::cerr << "Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs|carousel] [cycles] [instrument id] [bpm]\n";
         return 1;
     }
 
@@ -72,12 +72,12 @@ int main (int argc, char* argv[])
     }
     const int cycles = argc > 3 ? juce::String (argv[3]).getIntValue() : 2;
 
-    auto track = model::makeDemoTrack();
+    auto track = mode == "carousel" ? model::makeCarouselTrack() : model::makeDemoTrack();
 
     if (argc > 4)
         track.instrument = static_cast<model::InstrumentId> (juce::String (argv[4]).getIntValue());
 
-    if (mode != "timeline")
+    if (mode != "timeline" && mode != "carousel")
     {
         track.mode = model::PlaybackMode::Algorithm;
         track.treeMethod = model::TreeMethod::BFS;

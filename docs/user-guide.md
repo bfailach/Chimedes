@@ -16,7 +16,7 @@ Everything Chimedes can do, in detail. For a quick overview, see the [README](..
 
 ## The workspace
 
-The app opens with a demo graph; the **New** button (sheet icon) starts an empty one. The canvas fills the whole window, with floating panels: tracks on the left, file actions at the top, properties on the right and the transport at the bottom, with play, stop and pause in the middle of the bar.
+The app opens with *Carousel*, an original 16-bar waltz in D minor for kalimba: each beat is a star on a ring, played clockwise in algorithm mode, and the stars sit further out the higher their melody note, like carousel horses. The **New** button (sheet icon) starts an empty one. The canvas fills the whole window, with floating panels: tracks on the left, file actions at the top, properties on the right and the transport at the bottom, with play, stop and pause in the middle of the bar.
 
 | Action | How |
 | --- | --- |
@@ -127,4 +127,4 @@ The engine turns each track into a **schedule**: the list of notes in one cycle 
 ./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2 3
 ```
 
-Modes: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Then come the number of cycles and, optionally, the instrument id (see [`Source/model/Instruments.h`](../Source/model/Instruments.h): 1 organ, 6 bass, 17 piano, 25 strings, 28 choir…). The tool prints the expected time of each note next to the onsets it detects in the audio.
+Modes: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs` (the small demo graph) and `carousel` (the waltz the app opens with). Then come the number of cycles and, optionally, the instrument id (see [`Source/model/Instruments.h`](../Source/model/Instruments.h): 1 organ, 6 bass, 17 piano, 25 strings, 28 choir…). The tool prints the expected time of each note next to the onsets it detects in the audio.

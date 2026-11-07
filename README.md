@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/chimedes-demo.gif" alt="Chimedes playing its demo graph: each star flashes in its note's colour as playback walks the edges" width="100%">
+  <img src="docs/images/chimedes-demo.gif" alt="Chimedes playing Carousel, its built-in waltz: a ring of stars that light up one beat at a time" width="100%">
 </p>
 
 ## About
@@ -60,7 +60,7 @@ macOS and Linux builds are not published yet; you can [build from source](#build
 
 ## Quick start
 
-1. Open Chimedes. It starts with a demo graph; press **Space** to play it.
+1. Open Chimedes. It starts with *Carousel*, a short waltz for kalimba drawn as a ring of stars; press **Space** to play it.
 2. **Double-click** on empty space to add a node, and **drag from the edge of a node** to another to connect them.
 3. Pick a note on the keyboard in the right panel (or press **A W S E D F…** on your keyboard) and press **Enter** to give it to the node.
 4. Switch the track to **Algorithm** mode and try different trees and traversals.
