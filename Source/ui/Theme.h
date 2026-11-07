@@ -59,8 +59,8 @@ namespace chimedes::ui::theme
         return pitchColour (midiPitch).interpolatedWith (accent, 0.45f);
     }
 
-    // Fonts bundled with the application (see Fonts.cpp): Space Grotesk for the
-    // UI and JetBrains Mono for figures (time, values).
+    // Fonts bundled with the application (see Fonts.cpp): Sora for the
+    // UI and DM Mono for figures (time, values).
     juce::Typeface::Ptr sansTypeface();
     juce::Typeface::Ptr monoTypeface();
 

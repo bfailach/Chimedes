@@ -9,15 +9,15 @@ namespace chimedes::ui::theme
 // (Resources/Fonts, SIL OFL license), so they look the same on every system.
 juce::Typeface::Ptr sansTypeface()
 {
-    static const auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::SpaceGrotesk_ttf,
-                                                                          BinaryData::SpaceGrotesk_ttfSize);
+    static const auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::Sora_ttf,
+                                                                          BinaryData::Sora_ttfSize);
     return typeface;
 }
 
 juce::Typeface::Ptr monoTypeface()
 {
-    static const auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::JetBrainsMono_ttf,
-                                                                          BinaryData::JetBrainsMono_ttfSize);
+    static const auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::DMMono_ttf,
+                                                                          BinaryData::DMMono_ttfSize);
     return typeface;
 }
 

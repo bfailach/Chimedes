@@ -16,7 +16,7 @@ ChimedesLookAndFeel::ChimedesLookAndFeel()
                               theme::controlPressed,  // highlightedFill
                               theme::textPrimary })   // menuText
 {
-    // The whole UI uses Space Grotesk, bundled in the executable.
+    // The whole UI uses Sora, bundled in the executable.
     setDefaultSansSerifTypeface (theme::sansTypeface());
 
     setColour (juce::ResizableWindow::backgroundColourId, theme::background);

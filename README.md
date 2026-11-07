@@ -77,7 +77,7 @@ The canvas is drawn as a star map on soft black (the *Starlight* theme). Each no
 
 Colours follow the colour wheel by pitch class: C red, D orange, E green, G blue, A violet, B magenta. A C is the same colour in any octave, and the selected keys on the panel's keyboard use the same colours. The rest of the UI is almost monochrome, with starlight white as the only accent.
 
-Fonts: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) for the UI and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) for figures, both under the SIL Open Font License (see `Resources/Fonts`). They are bundled in the executable.
+Fonts: [Sora](https://github.com/sora-xor/sora-font) for the UI and [DM Mono](https://github.com/googlefonts/dm-mono) for figures, both under the SIL Open Font License (see `Resources/Fonts`). They are bundled in the executable.
 
 ## Several tracks
 
