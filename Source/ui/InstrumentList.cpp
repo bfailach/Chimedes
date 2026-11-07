@@ -45,6 +45,17 @@ void InstrumentList::rebuild()
         y += height;
     };
 
+    // "Load sample…" first, so it never needs scrolling, then the loaded samples
+    // and the built-ins by family.
+    add (Kind::LoadSample, 0, canLoadSample ? text ("Load sample…") : text ("Load sample… (10 max)"));
+
+    if (! samples.empty())
+    {
+        add (Kind::Heading, 0, text ("Samples"));
+        for (const auto& [id, name] : samples)
+            add (Kind::Sample, id, name);
+    }
+
     for (std::size_t c = 0; c < model::instruments::categoryNames.size(); ++c)
     {
         add (Kind::Heading, 0, text (model::instruments::categoryNames[c]));
@@ -53,11 +64,6 @@ void InstrumentList::rebuild()
             if (info.category == static_cast<model::instruments::Category> (c))
                 add (Kind::BuiltIn, info.id, text (info.name));
     }
-
-    add (Kind::Heading, 0, text ("Samples"));
-    for (const auto& [id, name] : samples)
-        add (Kind::Sample, id, name);
-    add (Kind::LoadSample, 0, canLoadSample ? text ("Load sample…") : text ("Load sample… (10 max)"));
 
     hovered = -1;
     setSize (getWidth(), y);

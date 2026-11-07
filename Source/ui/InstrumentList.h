@@ -11,8 +11,8 @@
 namespace chimedes::ui
 {
 
-// Always-open list of instruments: the built-ins under their family headings,
-// then the project's samples and "Load sample…". Each row has its icon; the
+// Always-open list of instruments: "Load sample…", the project's samples and
+// then the built-ins under their family headings. Each row has its icon; the
 // chosen one is highlighted. It is as tall as its content: put it in a Viewport.
 class InstrumentList : public juce::Component
 {

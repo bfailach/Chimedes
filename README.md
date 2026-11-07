@@ -108,7 +108,7 @@ Projects made before keep their instruments: ids 1 to 6 are the original six and
 
 ### Your own samples
 
-At the end of the track's instrument list, or in a node's drop-down, **Load sample…** opens a WAV, AIFF, FLAC or OGG file (up to 30 seconds) and uses it as an instrument: the sample is taken as recorded at middle C (C4) and transposed for each note. A project holds up to ten samples; when there is no room, the ones nobody uses are removed. Loading the same file again reuses the sample.
+At the top of the track's instrument list (the loaded samples are listed right below it), or in a node's drop-down, **Load sample…** opens a WAV, AIFF, FLAC or OGG file (up to 30 seconds) and uses it as an instrument: the sample is taken as recorded at middle C (C4) and transposed for each note. A project holds up to ten samples; when there is no room, the ones nobody uses are removed. Loading the same file again reuses the sample.
 
 The project stores the file's path, not the audio. If the sample is inside the project folder, the path is saved as relative, so the whole folder can be moved or shared. If a file is missing when opening, a warning appears and that sample stays silent; the rest of the project plays normally.
 
