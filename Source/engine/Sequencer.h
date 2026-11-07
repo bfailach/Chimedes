@@ -8,20 +8,20 @@
 namespace chimedes::engine
 {
 
-// Convierte el horario de una pista en mensajes note-on / note-off, bloque a bloque.
+// Turns a track's schedule into note-on / note-off messages, block by block.
 //
-// Es seguro para el hilo de audio: no asigna memoria ni bloquea. Trabaja en pulsos
-// absolutos desde que empezó la reproducción y repite el horario en ciclos.
+// Safe for the audio thread: it neither allocates nor locks. It works in absolute
+// beats since playback started and repeats the schedule in cycles.
 //
-// Los note-off salen de su propia lista de notas activas, no del horario. Así, si el
-// horario cambia a mitad de una nota (edición en vivo), esa nota termina con normalidad.
+// Note-offs come from its own list of active notes, not from the schedule. So if the
+// schedule changes in the middle of a note (live editing), that note ends normally.
 class Sequencer
 {
 public:
     static constexpr int maxActiveNotes = 256;
 
-    // El horario lo posee otra parte; debe seguir vivo mientras esté puesto aquí.
-    // Al cambiarlo, el cursor se recoloca en la posición actual del ciclo.
+    // The schedule is owned elsewhere; it must stay alive while it is set here.
+    // When it changes, the cursor moves to the current position in the cycle.
     void setSchedule (const Schedule* newSchedule) noexcept
     {
         if (newSchedule != schedule)
@@ -33,14 +33,14 @@ public:
 
     const Schedule* getSchedule() const noexcept { return schedule; }
 
-    // Vuelve al principio (al detener). Llama antes a allNotesOff si hay notas activas.
+    // Goes back to the beginning (on stop). Call allNotesOff first if notes are active.
     void rewind() noexcept
     {
         needsResync = true;
         numActive = 0;
     }
 
-    // Emite los mensajes del tramo [fromBeat, toBeat). El receptor se llama como
+    // Emits the messages for [fromBeat, toBeat). The sink is called as
     // sink (double beat, int pitch, int velocity, int instrument, bool isNoteOn).
     template <typename Sink>
     void process (double fromBeat, double toBeat, Sink&& sink)
@@ -49,7 +49,7 @@ public:
         emitNoteOffs (toBeat, sink);
     }
 
-    // Apaga todas las notas activas en el pulso indicado (al pausar o detener).
+    // Turns off every active note at the given beat (on pause or stop).
     template <typename Sink>
     void allNotesOff (double beat, Sink&& sink)
     {
@@ -72,8 +72,8 @@ private:
         double endBeat = 0.0;
     };
 
-    // Avanza un cursor por los eventos del horario. Cada evento se emite una sola vez
-    // por ciclo, sin depender del redondeo de los pulsos entre bloques.
+    // Moves a cursor through the schedule's events. Each event is emitted exactly once
+    // per cycle, without depending on how beats round between blocks.
     template <typename Sink>
     void emitNoteOns (double fromBeat, double toBeat, Sink& sink)
     {
@@ -108,7 +108,7 @@ private:
         }
     }
 
-    // Coloca el cursor en el primer evento que aún no ha sonado en `beat`.
+    // Places the cursor on the first event that has not sounded yet at `beat`.
     void resync (double beat) noexcept
     {
         const auto cycle = schedule->cycleLengthBeats;
@@ -146,8 +146,8 @@ private:
     template <typename Sink>
     void startNote (double beat, int pitch, int velocity, int instrument, double endBeat, Sink& sink)
     {
-        // Si la misma nota ya suena en el mismo instrumento, se apaga antes de volver a
-        // tocarla, para que su note-off pendiente no corte la nueva.
+        // If the same note is already sounding on the same instrument, it is turned off
+        // before playing it again, so its pending note-off does not cut the new one.
         for (int i = 0; i < numActive; ++i)
         {
             const auto& note = active[static_cast<std::size_t> (i)];
@@ -159,7 +159,7 @@ private:
             }
         }
 
-        // Sin espacio: se apaga la nota que antes iba a terminar.
+        // No room left: the note that was going to end soonest is turned off.
         if (numActive == maxActiveNotes)
         {
             int earliest = 0;

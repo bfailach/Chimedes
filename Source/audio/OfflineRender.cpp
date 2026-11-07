@@ -17,13 +17,13 @@ juce::Result renderProjectToWav (const model::Project& project,
     constexpr double maxSeconds = 20.0 * 60.0;
 
     if (lengthBeats <= 0.0 || project.bpm <= 0.0)
-        return juce::Result::fail (juce::String::fromUTF8 ("No hay ninguna pista que suene."));
+        return juce::Result::fail ("No track is playing.");
 
     const auto musicSeconds = lengthBeats * 60.0 / project.bpm;
     if (musicSeconds > maxSeconds)
-        return juce::Result::fail (juce::String::fromUTF8 ("La exportación pasaría de 20 minutos."));
+        return juce::Result::fail ("The export would be longer than 20 minutes.");
 
-    // Motor aparte: el de la app sigue sonando (o no) sin enterarse.
+    // Separate engine: the app's keeps playing (or not) without noticing.
     AudioEngine engine;
     engine.prepareToPlay (blockSize, settings.sampleRate);
     engine.setBpm (project.bpm);
@@ -47,7 +47,7 @@ juce::Result renderProjectToWav (const model::Project& project,
     juce::AudioBuffer<float> rendered (2, totalSamples);
     rendered.clear();
 
-    // La música hasta el final exacto; luego pausa (las notas se apagan con su cola).
+    // Music until the exact end; then pause (notes die out with their tail).
     for (int start = 0; start < totalSamples;)
     {
         if (start == musicSamples)
@@ -59,10 +59,10 @@ juce::Result renderProjectToWav (const model::Project& project,
         start += n;
 
         if (progress && ! progress (0.9 * start / totalSamples))
-            return juce::Result::fail ("cancelado");
+            return juce::Result::fail ("cancelled");
     }
 
-    // Sin recortes: si algo pasa de 0 dB, se baja todo por igual.
+    // No clipping: if anything goes over 0 dB, everything is turned down evenly.
     const auto peak = rendered.getMagnitude (0, totalSamples);
     if (peak > 0.98f)
         rendered.applyGain (0.98f / peak);
@@ -70,7 +70,7 @@ juce::Result renderProjectToWav (const model::Project& project,
     output.deleteFile();
     std::unique_ptr<juce::OutputStream> stream (output.createOutputStream());
     if (stream == nullptr)
-        return juce::Result::fail (juce::String::fromUTF8 ("No se pudo crear el archivo."));
+        return juce::Result::fail ("Could not create the file.");
 
     juce::WavAudioFormat wav;
     auto writer = wav.createWriterFor (stream,
@@ -79,10 +79,10 @@ juce::Result renderProjectToWav (const model::Project& project,
                                            .withNumChannels (2)
                                            .withBitsPerSample (settings.bitsPerSample));
     if (writer == nullptr)
-        return juce::Result::fail (juce::String::fromUTF8 ("No se pudo escribir el WAV."));
+        return juce::Result::fail ("Could not write the WAV.");
 
     if (! writer->writeFromAudioSampleBuffer (rendered, 0, totalSamples))
-        return juce::Result::fail (juce::String::fromUTF8 ("No se pudo escribir el WAV (¿disco lleno?)."));
+        return juce::Result::fail ("Could not write the WAV (is the disk full?).");
 
     if (progress)
         progress (1.0);

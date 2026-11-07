@@ -8,44 +8,44 @@
 namespace chimedes::model
 {
 
-// Sustituye el grafo de la pista por uno generado al azar. Cambian los nodos, las
-// aristas, el inicio y el fin; las opciones de la pista (modo, algoritmo, instrumento…)
-// se conservan. Con la misma semilla se obtiene siempre el mismo grafo.
+// Replaces the track's graph with a randomly generated one. Nodes, edges, start
+// and end change; the track's options (mode, algorithm, instrument…) are kept.
+// The same seed always gives the same graph.
 //
-// Se eligen al azar:
-//   - cantidad de nodos ......... de 5 a 14
-//   - forma ..................... cadena, ramas, abanico o red
-//   - distribución .............. nodos repartidos parejo, apiñados al principio o al final
-//   - cercanía .................. dispersión vertical, de compacta a amplia
-//   - duración general .......... 4, 6, 8, 12 o 16 pulsos de inicio a fin
-//   - notas ..................... una escala y tonalidad al azar, con algún acorde
+// Chosen at random:
+//   - number of nodes ........... 5 to 14
+//   - shape ..................... chain, branches, fan or web
+//   - distribution .............. nodes spread evenly, bunched at the start or at the end
+//   - closeness ................. vertical spread, from compact to wide
+//   - overall length ............ 4, 6, 8, 12 or 16 beats from start to end
+//   - notes ..................... a random scale and key, with the odd chord
 //
-// El grafo resultante siempre se puede reproducir: cada nodo cuelga de uno anterior
-// (más a la izquierda), así que todos son alcanzables desde el inicio, incluso en
-// grafos dirigidos, y el fin es el nodo más a la derecha.
+// The resulting graph can always be played: every node hangs from an earlier one
+// (further left), so all of them are reachable from the start, even in directed
+// graphs, and the end is the rightmost node.
 void randomizeGraph (Track& track, std::uint32_t seed);
 
-// Las demás conservan el grafo (nodos, posiciones y aristas) y cambian una sola cosa.
-// Con la misma semilla dan siempre el mismo resultado.
+// The others keep the graph (nodes, positions and edges) and change one thing only.
+// The same seed always gives the same result.
 
-// Notas: una escala y tonalidad nuevas; la melodía sigue las aristas desde el inicio
-// (cada nodo da un paso por la escala desde el que lo precede), con algún acorde, y el
-// fin cierra en la tónica.
+// Notes: a new scale and key; the melody follows the edges from the start (each
+// node takes a scale step from the one before it), with the odd chord, and the
+// end resolves to the tonic.
 void randomizeNotes (Track& track, std::uint32_t seed);
 
-// Ritmo: duraciones e intensidades de las notas. El nodo de fin conserva su duración,
-// para que en línea de tiempo el ciclo siga durando lo mismo.
+// Rhythm: note durations and velocities. The end node keeps its duration, so in
+// timeline mode the cycle stays the same length.
 void randomizeRhythm (Track& track, std::uint32_t seed);
 
-// Instrumentos: el de la pista, elegido entre `available`, y a veces algunos nodos con
-// otro distinto. Si `available` está vacío, no cambia nada.
+// Instruments: the track's, chosen from `available`, and sometimes a few nodes
+// with a different one. If `available` is empty, nothing changes.
 void randomizeInstruments (Track& track, std::uint32_t seed, const std::vector<InstrumentId>& available);
 
-// Algoritmo: árbol (Prim solo en grafos no dirigidos), recorrido, hermanos y ajuste al
-// pulso. El modo (línea de tiempo o algoritmo) no cambia.
+// Algorithm: tree (Prim only on undirected graphs), traversal, siblings and beat
+// snapping. The mode (timeline or algorithm) does not change.
 void randomizeAlgorithm (Track& track, std::uint32_t seed);
 
-// Todo lo anterior: grafo nuevo con sus notas, ritmo, instrumentos y algoritmo.
+// All of the above: a new graph with its notes, rhythm, instruments and algorithm.
 void randomizeEverything (Track& track, std::uint32_t seed, const std::vector<InstrumentId>& available);
 
 } // namespace chimedes::model

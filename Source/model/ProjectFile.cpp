@@ -19,10 +19,10 @@ namespace chimedes::model
 namespace
 {
     // -----------------------------------------------------------------------
-    // JSON mínimo: lo justo para este formato, sin depender de JUCE (así el
-    // motor y sus pruebas siguen compilando solos). Los números se leen y
-    // escriben con <charconv>, que no depende del idioma del sistema (una coma
-    // decimal en Windows en español no rompe el archivo).
+    // Minimal JSON: just what this format needs, with no JUCE dependency (so the
+    // engine and its tests still build on their own). Numbers are read and
+    // written with <charconv>, which does not depend on the system language (a
+    // decimal comma on a Spanish Windows does not break the file).
     // -----------------------------------------------------------------------
 
     struct Json;
@@ -73,16 +73,16 @@ namespace
             auto result = parseValue (0);
             skipSpace();
             if (pos != text.size())
-                fail ("hay texto de más al final");
+                fail ("unexpected text at the end");
             return result;
         }
 
     private:
         [[noreturn]] void fail (const std::string& what) const
         {
-            // Línea donde está el error, para quien edite el archivo a mano.
+            // Line where the error is, for whoever edits the file by hand.
             const auto line = 1 + std::count (text.begin(), text.begin() + static_cast<std::ptrdiff_t> (std::min (pos, text.size())), '\n');
-            throw std::runtime_error (what + " (línea " + std::to_string (line) + ")");
+            throw std::runtime_error (what + " (line " + std::to_string (line) + ")");
         }
 
         void skipSpace()
@@ -105,17 +105,17 @@ namespace
         void expect (char c)
         {
             if (! consume (c))
-                fail (std::string ("se esperaba '") + c + "'");
+                fail (std::string ("expected '") + c + "'");
         }
 
         Json parseValue (int depth)
         {
             if (depth > 64)
-                fail ("anidamiento demasiado profundo");
+                fail ("nesting too deep");
 
             skipSpace();
             if (pos >= text.size())
-                fail ("el archivo termina antes de tiempo");
+                fail ("the file ends too early");
 
             const auto c = text[pos];
 
@@ -127,7 +127,7 @@ namespace
             if (c == 'n' && text.compare (pos, 4, "null") == 0)   { pos += 4; return {}; }
             if (c == '-' || (c >= '0' && c <= '9'))               return { parseNumber() };
 
-            fail ("valor no válido");
+            fail ("invalid value");
         }
 
         Json parseObject (int depth)
@@ -141,7 +141,7 @@ namespace
                 {
                     skipSpace();
                     if (pos >= text.size() || text[pos] != '"')
-                        fail ("se esperaba el nombre de un campo entre comillas");
+                        fail ("expected a field name in quotes");
                     auto key = parseString();
                     expect (':');
                     (*object)[key] = parseValue (depth + 1);
@@ -178,14 +178,14 @@ namespace
             double value = 0.0;
             const auto [next, error] = std::from_chars (begin, end, value);
             if (error != std::errc() || ! std::isfinite (value))
-                fail ("número no válido");
+                fail ("invalid number");
             pos += static_cast<std::size_t> (next - begin);
             return value;
         }
 
         std::string parseString()
         {
-            ++pos;  // comilla inicial
+            ++pos;  // opening quote
             std::string out;
 
             while (pos < text.size())
@@ -197,7 +197,7 @@ namespace
 
                 if (c != '\\')
                 {
-                    out += c;   // UTF-8 se copia tal cual
+                    out += c;   // UTF-8 is copied as is
                     continue;
                 }
 
@@ -216,20 +216,20 @@ namespace
                     case 'u':
                     {
                         if (pos + 4 > text.size())
-                            fail ("escape \\u incompleto");
+                            fail ("incomplete \\u escape");
                         unsigned code = 0;
                         const auto [p, err] = std::from_chars (text.data() + pos, text.data() + pos + 4, code, 16);
                         if (err != std::errc() || p != text.data() + pos + 4)
-                            fail ("escape \\u no válido");
+                            fail ("invalid \\u escape");
                         pos += 4;
                         appendUtf8 (out, code);
                         break;
                     }
-                    default: fail ("escape no válido en un texto");
+                    default: fail ("invalid escape in a string");
                 }
             }
 
-            fail ("falta la comilla de cierre de un texto");
+            fail ("missing closing quote of a string");
         }
 
         static void appendUtf8 (std::string& out, unsigned code)
@@ -255,7 +255,7 @@ namespace
         std::size_t pos = 0;
     };
 
-    // --- Escritura ----------------------------------------------------------
+    // --- Writing --------------------------------------------------------------
 
     std::string number (double value)
     {
@@ -295,7 +295,7 @@ namespace
         return out + "\"";
     }
 
-    // Opciones como palabras: el archivo se entiende al leerlo.
+    // Options as words: the file can be understood by reading it.
     template <typename Enum, std::size_t N>
     struct Names
     {
@@ -325,7 +325,7 @@ namespace
     const Names<Traversal, 2> traversalNames { { { { Traversal::BFS, "bfs" }, { Traversal::DFS, "dfs" } } } };
     const Names<SiblingMode, 2> siblingNames { { { { SiblingMode::Sequential, "sequential" }, { SiblingMode::Simultaneous, "simultaneous" } } } };
 
-    // --- Lectura con valores por defecto -------------------------------------
+    // --- Reading with default values ------------------------------------------
 
     const Json* field (const JsonObject& object, const char* key)
     {
@@ -395,7 +395,7 @@ namespace
         t.instrument = idOr (o, "instrument", 1);
         t.muted = boolOr (o, "muted", false);
 
-        // Nodos: sin id válido o con id repetido se les da uno nuevo.
+        // Nodes: those without a valid id or with a repeated id get a new one.
         std::set<NodeId> used;
         if (const auto* f = field (o, "nodes"); f != nullptr && f->array() != nullptr)
             for (const auto& item : *f->array())
@@ -416,7 +416,7 @@ namespace
 
         const auto exists = [&t] (NodeId id) { return t.findNode (id) != nullptr; };
 
-        // Aristas: solo entre nodos que existen, sin bucles ni repetidas.
+        // Edges: only between nodes that exist, with no loops or duplicates.
         std::set<std::pair<NodeId, NodeId>> seen;
         EdgeId nextEdge = 1;
         if (const auto* f = field (o, "edges"); f != nullptr && f->array() != nullptr)
@@ -474,7 +474,7 @@ std::string projectToJson (const Project& project)
         out += "      \"start\": " + std::to_string (t.startNode) + ",\n";
         out += "      \"end\": " + std::to_string (t.endNode) + ",\n";
 
-        // Un nodo y una arista por línea: el archivo sigue siendo fácil de leer y de comparar.
+        // One node and one edge per line: the file stays easy to read and to diff.
         out += "      \"nodes\": [";
         for (std::size_t i = 0; i < t.nodes.size(); ++i)
         {
@@ -509,7 +509,7 @@ std::string projectToJson (const Project& project)
 
     out += project.tracks.empty() ? "]" : "\n  ]";
 
-    // Muestras: solo si hay alguna, para que los proyectos sin muestras no cambien.
+    // Samples: only if there are any, so projects without samples do not change.
     if (! project.samples.empty())
     {
         out += ",\n  \"samples\": [";
@@ -540,7 +540,7 @@ ProjectLoadResult projectFromJson (const std::string& json)
     }
     catch (const std::exception& e)
     {
-        result.error = std::string ("El archivo está dañado: ") + e.what() + ".";
+        result.error = std::string ("The file is damaged: ") + e.what() + ".";
         return result;
     }
 
@@ -548,14 +548,14 @@ ProjectLoadResult projectFromJson (const std::string& json)
     const auto* format = object != nullptr ? stringOf (*object, "format") : nullptr;
     if (format == nullptr || *format != "chimedes")
     {
-        result.error = "No es un proyecto de Chimedes.";
+        result.error = "This is not a Chimedes project.";
         return result;
     }
 
     const auto version = numberOr (*object, "version", 1.0);
     if (version > currentProjectFormatVersion)
     {
-        result.error = "El proyecto se creó con una versión más nueva de Chimedes.";
+        result.error = "The project was made with a newer version of Chimedes.";
         return result;
     }
 
@@ -570,7 +570,7 @@ ProjectLoadResult projectFromJson (const std::string& json)
                 result.project.tracks.push_back (readTrack (*obj, nextTrack++));
     }
 
-    // Muestras: id entre 7 y 16, sin repetir y con ruta; las demás se descartan.
+    // Samples: id between 7 and 16, not repeated and with a path; the rest are dropped.
     if (const auto* f = field (*object, "samples"); f != nullptr && f->array() != nullptr)
         for (const auto& item : *f->array())
             if (const auto* obj = item.object())

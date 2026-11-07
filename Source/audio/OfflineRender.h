@@ -15,16 +15,16 @@ struct OfflineRenderSettings
 {
     double sampleRate = 48000.0;
     int bitsPerSample = 24;
-    double tailSeconds = 2.0;   // después del final, para que las notas se apaguen solas
+    double tailSeconds = 2.0;   // after the end, so notes die out on their own
 };
 
-// Renderiza el proyecto a un WAV con el mismo motor que suena en vivo (en una
-// instancia aparte, sin tarjeta de sonido y más rápido que en tiempo real).
-// Suenan las pistas no silenciadas durante `lengthBeats` pulsos al BPM del proyecto;
-// después, las notas terminan con su cola. Si el resultado pasa de 0 dB, se baja el
-// volumen entero para que no recorte.
+// Renders the project to a WAV with the same engine that plays live (in a
+// separate instance, without a sound card and faster than real time).
+// Unmuted tracks play for `lengthBeats` beats at the project's BPM; after that,
+// notes end with their tail. If the result goes over 0 dB, the whole thing is
+// turned down so it does not clip.
 //
-// `progress` recibe de 0 a 1 y puede devolver false para cancelar (no se escribe nada).
+// `progress` gets 0 to 1 and can return false to cancel (nothing is written).
 juce::Result renderProjectToWav (const model::Project& project,
                                  const std::vector<SampleData>& samples,
                                  double lengthBeats,

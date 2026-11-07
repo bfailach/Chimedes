@@ -14,13 +14,13 @@ namespace chimedes::ui
 
 namespace
 {
-    // Subdivisiones del ajuste al pulso, en el orden del desplegable.
+    // Beat snapping subdivisions, in drop-down order.
     constexpr std::array<double, 4> quantizeSteps { 0.0, 1.0, 0.5, 0.25 };
 
-    // Id del primer instrumento en los desplegables. En el del nodo, el id 1 es
-    // "Como la pista" (instrumento 0 del modelo) y los instrumentos empiezan en 2.
+    // Id of the first instrument in the drop-downs. In the node's, id 1 is
+    // "Same as track" (model instrument 0) and instruments start at 2.
     constexpr int nodeUsesTrackItem = 1;
-    constexpr int loadSampleItem = 900;   // "Cargar muestra…" en los dos desplegables
+    constexpr int loadSampleItem = 900;   // "Load sample…" in both drop-downs
 
     int quantizeIndex (double beats)
     {
@@ -46,15 +46,15 @@ namespace
 
 Inspector::Inspector()
 {
-    // --- Pista -------------------------------------------------------------
-    styleHeader (trackHeader, "Pista");
+    // --- Track -------------------------------------------------------------
+    styleHeader (trackHeader, "Track");
 
-    modeBox.addItemList ({ text ("Línea de tiempo"), "Algoritmo" }, 1);
-    treeBox.addItemList ({ text ("Árbol: BFS"), text ("Árbol: DFS"), text ("Árbol: Dijkstra"), text ("Árbol: Prim") }, 1);
-    traversalBox.addItemList ({ "Recorrido: BFS", "Recorrido: DFS" }, 1);
-    siblingsBox.addItemList ({ "Hermanos: en secuencia", "Hermanos: a la vez" }, 1);
-    quantizeBox.addItemList ({ "Ajuste al pulso: libre", "Ajuste al pulso: 1", "Ajuste al pulso: 1/2", "Ajuste al pulso: 1/4" }, 1);
-    directedToggle.setButtonText ("Grafo dirigido");
+    modeBox.addItemList ({ "Timeline", "Algorithm" }, 1);
+    treeBox.addItemList ({ "Tree: BFS", "Tree: DFS", "Tree: Dijkstra", "Tree: Prim" }, 1);
+    traversalBox.addItemList ({ "Traversal: BFS", "Traversal: DFS" }, 1);
+    siblingsBox.addItemList ({ "Siblings: in sequence", "Siblings: together" }, 1);
+    quantizeBox.addItemList ({ "Snap to beat: off", "Snap to beat: 1", "Snap to beat: 1/2", "Snap to beat: 1/4" }, 1);
+    directedToggle.setButtonText ("Directed graph");
 
     rebuildInstrumentBoxes();
 
@@ -102,19 +102,19 @@ Inspector::Inspector()
         callbacks.edit ([directed] (model::Track& t) { t.directed = directed; });
     };
 
-    // --- Nodo --------------------------------------------------------------
-    styleHeader (nodeHeader, "Nodo");
-    styleCaption (notesLabel, "Notas");
-    styleCaption (notesHint, "Clic o letras A–K: probar · Mayús: acorde");
-    styleCaption (instrumentLabel, "Instrumento");
-    styleCaption (durationLabel, "Duración (pulsos)");
-    styleCaption (velocityLabel, "Intensidad");
-    styleCaption (noSelectionLabel, "Selecciona un nodo para editarlo.");
+    // --- Node --------------------------------------------------------------
+    styleHeader (nodeHeader, "Node");
+    styleCaption (notesLabel, "Notes");
+    styleCaption (notesHint, "Click or keys A–K: try · Shift: chord");
+    styleCaption (instrumentLabel, "Instrument");
+    styleCaption (durationLabel, "Duration (beats)");
+    styleCaption (velocityLabel, "Velocity");
+    styleCaption (noSelectionLabel, "Select a node to edit it.");
     notesHint.setFont (juce::FontOptions (12.0f));
     notesValue.setJustificationType (juce::Justification::centredRight);
     notesValue.setColour (juce::Label::textColourId, theme::textPrimary);
 
-    // Tocar el piano prueba la nota; Enter la guarda en el nodo (se puede deshacer).
+    // Playing the piano previews the note; Enter saves it to the node (undoable).
     piano.onCommit = [this] (std::vector<int> pitches)
     {
         editNode ([p = std::move (pitches)] (model::Node& n) { n.pitches = p; });
@@ -149,12 +149,12 @@ Inspector::Inspector()
     connectSlider (durationSlider, [] (model::Node& n, double v) { n.durationBeats = v; });
     connectSlider (velocitySlider, [] (model::Node& n, double v) { n.velocity = static_cast<int> (v); });
 
-    startButton.setButtonText (text ("Inicio"));
-    endButton.setButtonText (text ("Fin"));
-    deleteButton.setButtonText (text ("Eliminar nodo"));
+    startButton.setButtonText ("Start");
+    endButton.setButtonText ("End");
+    deleteButton.setButtonText ("Delete node");
 
-    startButton.setTooltip (text ("Marcar este nodo como inicio"));
-    endButton.setTooltip (text ("Marcar este nodo como fin"));
+    startButton.setTooltip ("Mark this node as the start");
+    endButton.setTooltip ("Mark this node as the end");
 
     startButton.onClick = [this]
     {
@@ -195,7 +195,7 @@ void Inspector::connectSlider (juce::Slider& slider, std::function<void (model::
                 apply (*n, value);
         };
 
-        // Arrastrando: cambio en vivo dentro del gesto. Si no (texto o teclado): una edición.
+        // While dragging: a live change inside the gesture. Otherwise (text or keyboard): one edit.
         if (slider.isMouseButtonDown())
             callbacks.updateGesture (change);
         else
@@ -225,7 +225,7 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
     directedToggle.setToggleState (track.directed, juce::dontSendNotification);
 
-    // Las opciones del algoritmo no aplican en el modo línea de tiempo.
+    // Algorithm options do not apply in timeline mode.
     const bool algorithm = track.mode == model::PlaybackMode::Algorithm;
     for (auto* c : std::initializer_list<juce::Component*> { &treeBox, &traversalBox, &siblingsBox, &quantizeBox })
         c->setEnabled (algorithm);
@@ -233,7 +233,7 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     const auto* n = track.findNode (selectedNode);
     const auto newNode = n != nullptr ? n->id : model::noNode;
 
-    // Otro nodo: la propuesta del anterior se descarta y se apagan las notas de prueba.
+    // Another node: the previous proposal is discarded and preview notes are turned off.
     if (newNode != node)
     {
         piano.releaseAllKeys();
@@ -284,7 +284,7 @@ void Inspector::resized()
 
 int Inspector::layout (bool apply)
 {
-    // Una sola rutina coloca los controles y mide el alto, para que nunca se desfasen.
+    // A single routine places the controls and measures the height, so they never drift apart.
     constexpr int padX = 14, padY = 12, rowH = 28;
     const auto width = getWidth() - 2 * padX;
     int y = padY;
@@ -339,14 +339,14 @@ int Inspector::layout (bool apply)
 
 void Inspector::updateNotesDisplay()
 {
-    // Con una propuesta sin guardar, las notas y la ayuda pasan a blanco estelar.
+    // With an unsaved proposal, the notes and the hint turn starlight white.
     const bool proposing = piano.hasPendingChange();
 
     notesValue.setText (juce::String (model::pitchNames (piano.getPendingPitches())), juce::dontSendNotification);
     notesValue.setColour (juce::Label::textColourId, proposing ? theme::accent : theme::textPrimary);
 
-    notesHint.setText (text (proposing ? "Enter: guardar · Esc: descartar"
-                                       : "Clic o letras A–K: probar · Mayús: acorde"),
+    notesHint.setText (text (proposing ? "Enter: save · Esc: discard"
+                                       : "Click or keys A–K: try · Shift: chord"),
                        juce::dontSendNotification);
     notesHint.setColour (juce::Label::textColourId, proposing ? theme::accent : theme::textSecondary);
 }
@@ -376,15 +376,15 @@ void Inspector::setSampleChoices (std::vector<std::pair<model::InstrumentId, juc
 
 void Inspector::rebuildInstrumentBoxes()
 {
-    // Integrados, luego las muestras del proyecto y al final "Cargar muestra…".
+    // Built-ins, then the project's samples and finally "Load sample…".
     trackInstrumentBox.clear (juce::dontSendNotification);
     nodeInstrumentBox.clear (juce::dontSendNotification);
-    nodeInstrumentBox.addItem ("Como la pista", nodeUsesTrackItem);
+    nodeInstrumentBox.addItem ("Same as track", nodeUsesTrackItem);
 
     for (int id = model::instruments::first; id <= model::instruments::count; ++id)
     {
         const auto name = text (model::instruments::name (static_cast<model::InstrumentId> (id)));
-        trackInstrumentBox.addItem (text ("Instrumento: ") + name, id);
+        trackInstrumentBox.addItem ("Instrument: " + name, id);
         nodeInstrumentBox.addItem (name, id + 1);
     }
 
@@ -395,12 +395,12 @@ void Inspector::rebuildInstrumentBoxes()
 
         for (const auto& [id, name] : sampleChoices)
         {
-            trackInstrumentBox.addItem (text ("Instrumento: ") + name, static_cast<int> (id));
+            trackInstrumentBox.addItem ("Instrument: " + name, static_cast<int> (id));
             nodeInstrumentBox.addItem (name, static_cast<int> (id) + 1);
         }
     }
 
-    const auto loadText = canLoadSample ? text ("Cargar muestra…") : text ("Cargar muestra… (máximo 10)");
+    const auto loadText = canLoadSample ? text ("Load sample…") : text ("Load sample… (10 max)");
     trackInstrumentBox.addSeparator();
     nodeInstrumentBox.addSeparator();
     trackInstrumentBox.addItem (loadText, loadSampleItem);

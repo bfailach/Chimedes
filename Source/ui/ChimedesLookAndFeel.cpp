@@ -16,7 +16,7 @@ ChimedesLookAndFeel::ChimedesLookAndFeel()
                               theme::controlPressed,  // highlightedFill
                               theme::textPrimary })   // menuText
 {
-    // Toda la interfaz usa Space Grotesk, incluida en el ejecutable.
+    // The whole UI uses Space Grotesk, bundled in the executable.
     setDefaultSansSerifTypeface (theme::sansTypeface());
 
     setColour (juce::ResizableWindow::backgroundColourId, theme::background);
@@ -97,7 +97,7 @@ void ChimedesLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height
         g.drawRoundedRectangle (bounds.reduced (0.5f), theme::controlRadius, 1.0f);
     }
 
-    // Chevron hacia abajo.
+    // Downward chevron.
     const auto cx = static_cast<float> (width) - 16.0f;
     const auto cy = static_cast<float> (height) * 0.5f;
     juce::Path chevron;
@@ -130,7 +130,7 @@ void ChimedesLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int
     const auto right = static_cast<float> (x + width) - 6.0f;
     const auto thumbX = juce::jlimit (left, right, sliderPos);
 
-    // Pista completa y tramo recorrido.
+    // Full track and the part covered.
     g.setColour (theme::controlPressed);
     g.fillRoundedRectangle (left, cy - 2.0f, right - left, 4.0f, 2.0f);
     g.setColour (slider.isEnabled() ? theme::accent : theme::textDisabled);

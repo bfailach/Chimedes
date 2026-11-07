@@ -7,8 +7,8 @@
 namespace chimedes::ui
 {
 
-// Botón de transporte dibujado como icono: detener, reproducir o pausa.
-// Activado (toggle), el icono se pinta sobre un círculo blanco estelar.
+// Transport button drawn as an icon: stop, play or pause.
+// When toggled on, the icon is painted on a starlight-white circle.
 class TransportButton : public juce::Button
 {
 public:

@@ -12,17 +12,17 @@
 namespace chimedes::ui
 {
 
-// Panel izquierdo: las pistas del proyecto. Todas suenan a la vez; la activa es la
-// que se ve entera y se edita en el lienzo y en el panel derecho.
-//   clic ............... activar la pista
-//   doble clic ......... renombrar
-//   altavoz ............ silenciar / volver a oír
-//   clic derecho ....... renombrar, duplicar, eliminar
-//   + .................. pista nueva
+// Left panel: the project's tracks. They all play at once; the active one is
+// drawn in full and edited on the canvas and in the right panel.
+//   click .............. make the track active
+//   double-click ....... rename
+//   speaker ............ mute / unmute
+//   right-click ........ rename, duplicate, delete
+//   + .................. new track
 class TrackList : public juce::Component
 {
 public:
-    static constexpr int maxTracks = 16;   // una por ranura del motor de audio
+    static constexpr int maxTracks = 16;   // one per audio engine slot
 
     TrackList();
     ~TrackList() override;
@@ -36,7 +36,7 @@ public:
 
     void refresh (const model::Project& project, std::size_t activeIndex);
 
-    // Alto que necesita para mostrar todas las pistas.
+    // Height it needs to show every track.
     int getIdealHeight() const;
 
     void paint (juce::Graphics& g) override;
@@ -53,7 +53,7 @@ private:
     void showRowMenu (std::size_t index);
 
     juce::Label header;
-    IconButton addButton { "Pista nueva", IconButton::Icon::Add };
+    IconButton addButton { "New track", IconButton::Icon::Add };
     std::vector<std::unique_ptr<Row>> rows;
     std::size_t active = 0;
 

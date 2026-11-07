@@ -4,15 +4,15 @@
 #include <string>
 #include <vector>
 
-// Conversión entre notas MIDI y nombres legibles, con el do central (60) como C4.
+// Conversion between MIDI notes and readable names, with middle C (60) as C4.
 namespace chimedes::model
 {
 
-// "C4" · "F#3" · "Bb2" · "60". Sin octava se asume la 4: "E" = E4.
+// "C4" · "F#3" · "Bb2" · "60". Without an octave, 4 is assumed: "E" = E4.
 std::optional<int> parsePitch (const std::string& text);
 
-// Varias notas separadas por espacios o comas: "C4 E4 G4". Devuelve nullopt si el
-// texto está vacío o alguna nota no se entiende.
+// Several notes separated by spaces or commas: "C4 E4 G4". Returns nullopt if the
+// text is empty or any note cannot be understood.
 std::optional<std::vector<int>> parsePitches (const std::string& text);
 
 // 61 → "C#4"

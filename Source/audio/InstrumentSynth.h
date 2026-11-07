@@ -10,7 +10,7 @@
 namespace chimedes::audio
 {
 
-// Un instrumento integrado. Responde solo a su canal MIDI, que es su id.
+// A built-in instrument. It only responds to its MIDI channel, which is its id.
 struct InstrumentSound : public juce::SynthesiserSound
 {
     explicit InstrumentSound (int instrumentId) : instrument (instrumentId) {}
@@ -21,10 +21,10 @@ struct InstrumentSound : public juce::SynthesiserSound
     const int instrument;
 };
 
-// Voz que sintetiza cualquiera de los instrumentos integrados. El instrumento se fija
-// al empezar cada nota, según el sonido (canal) que la dispara. No asigna memoria en
-// el hilo de audio: el búfer de la cuerda pulsada se reserva al fijar la frecuencia
-// de muestreo.
+// Voice that synthesizes any of the built-in instruments. The instrument is set
+// when each note starts, from the sound (channel) that triggers it. It does not
+// allocate on the audio thread: the pluck buffer is reserved when the sample rate
+// is set.
 class InstrumentVoice : public juce::SynthesiserVoice
 {
 public:
@@ -40,7 +40,7 @@ public:
         if (newRate > 0.0)
         {
             envelope.setSampleRate (newRate);
-            pluckBuffer.assign (static_cast<std::size_t> (newRate / 20.0) + 2, 0.0f);  // notas de 20 Hz o más
+            pluckBuffer.assign (static_cast<std::size_t> (newRate / 20.0) + 2, 0.0f);  // notes of 20 Hz or higher
         }
     }
 
@@ -88,7 +88,7 @@ public:
         }
     }
 
-    using juce::SynthesiserVoice::renderNextBlock;  // conserva la versión en double
+    using juce::SynthesiserVoice::renderNextBlock;  // keeps the double version
 
     void pitchWheelMoved (int) override {}
     void controllerMoved (int, int) override {}
@@ -119,7 +119,7 @@ public:
     }
 
 private:
-    // Una muestra del instrumento actual, sin envolvente ni ganancia.
+    // One sample of the current instrument, without envelope or gain.
     double nextSample (double t, double delta, double sampleRate)
     {
         namespace ids = model::instruments;
@@ -130,7 +130,7 @@ private:
         {
             case ids::electricPiano:
             {
-                // FM 1:1 con un índice que cae rápido: el ataque metálico de un piano de púas.
+                // 1:1 FM with a fast-falling index: the metallic attack of a tine piano.
                 const auto index = 1.8 * std::exp (-6.0 * t) + 0.2;
                 out = std::sin (phase + index * std::sin (modPhase));
                 advance (modPhase, delta);
@@ -139,7 +139,7 @@ private:
 
             case ids::bell:
             {
-                // FM 1:3,5, inarmónica, con un brillo que se apaga despacio.
+                // 1:3.5 FM, inharmonic, with a brightness that fades slowly.
                 const auto index = 3.0 * std::exp (-2.5 * t) + 0.1;
                 out = std::sin (phase + index * std::sin (modPhase));
                 advance (modPhase, delta * 3.5);
@@ -148,7 +148,7 @@ private:
 
             case ids::pluck:
             {
-                // Karplus-Strong: un búfer de ruido que se filtra a sí mismo en cada vuelta.
+                // Karplus-Strong: a noise buffer that filters itself on every pass.
                 const auto current = pluckBuffer[pluckIndex];
                 const auto next = pluckBuffer[(pluckIndex + 1) % pluckLength];
                 pluckBuffer[pluckIndex] = 0.5f * (current + next) * 0.996f;
@@ -159,7 +159,7 @@ private:
 
             case ids::pad:
             {
-                // Dos dientes de sierra ligeramente desafinados, suavizados con un filtro.
+                // Two slightly detuned sawtooths, softened with a filter.
                 const auto sawA = phase / juce::MathConstants<double>::pi - 1.0;
                 const auto sawB = detunePhase / juce::MathConstants<double>::pi - 1.0;
                 out = lowPass (0.5 * (sawA + sawB), 1400.0, sampleRate);
@@ -169,7 +169,7 @@ private:
 
             case ids::bass:
             {
-                // Sierra muy filtrada más una senoidal: redondo y con cuerpo.
+                // Heavily filtered saw plus a sine: round and full.
                 const auto saw = phase / juce::MathConstants<double>::pi - 1.0;
                 out = 0.6 * lowPass (saw, 600.0, sampleRate) + 0.6 * std::sin (phase);
                 break;
@@ -193,7 +193,7 @@ private:
             p -= juce::MathConstants<double>::twoPi;
     }
 
-    // Filtro paso bajo de un polo.
+    // One-pole low-pass filter.
     double lowPass (double input, double cutoff, double sampleRate) noexcept
     {
         const auto a = 1.0 - std::exp (-juce::MathConstants<double>::twoPi * cutoff / sampleRate);
@@ -210,7 +210,7 @@ private:
         for (std::size_t i = 0; i < pluckLength; ++i)
             pluckBuffer[i] = random.nextFloat() * 2.0f - 1.0f;
 
-        // Dos pasadas de media móvil: un ataque más cálido que el ruido blanco puro.
+        // Two moving-average passes: a warmer attack than pure white noise.
         for (int pass = 0; pass < 2; ++pass)
             for (std::size_t i = 0; i < pluckLength; ++i)
                 pluckBuffer[i] = 0.5f * (pluckBuffer[i] + pluckBuffer[(i + 1) % pluckLength]);

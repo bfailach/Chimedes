@@ -7,11 +7,11 @@
 namespace chimedes::ui
 {
 
-// Altavoz: con ondas si suena; tachado si la pista está silenciada.
+// Speaker: with waves when it sounds; crossed out when the track is muted.
 class TrackList::MuteButton : public juce::Button
 {
 public:
-    MuteButton() : juce::Button ("Silenciar")
+    MuteButton() : juce::Button ("Mute")
     {
         setClickingTogglesState (false);
     }
@@ -60,7 +60,7 @@ public:
     }
 };
 
-// Una fila: nombre de la pista, instrumento y botón de silencio.
+// One row: track name, instrument and mute button.
 class TrackList::Row : public juce::Component
 {
 public:
@@ -99,18 +99,18 @@ public:
         index = newIndex;
         active = isActive;
 
-        const auto title = track.name.empty() ? text ("Pista ") + juce::String (static_cast<int> (index) + 1)
+        const auto title = track.name.empty() ? "Track " + juce::String (static_cast<int> (index) + 1)
                                               : juce::String::fromUTF8 (track.name.c_str());
         name.setText (title, juce::dontSendNotification);
         name.setColour (juce::Label::textColourId, track.muted ? theme::textDisabled
                                                    : isActive  ? theme::textPrimary
                                                                : theme::textSecondary);
 
-        // Instrumento de la pista, abreviado, para distinguirlas de un vistazo.
+        // The track's instrument, so tracks can be told apart at a glance.
         detail.setText (instrumentName, juce::dontSendNotification);
 
         mute.setToggleState (track.muted, juce::dontSendNotification);
-        mute.setTooltip (track.muted ? text ("Volver a oír") : text ("Silenciar"));
+        mute.setTooltip (track.muted ? "Unmute" : "Mute");
         repaint();
     }
 
@@ -124,7 +124,7 @@ public:
             g.fillRoundedRectangle (getLocalBounds().toFloat(), theme::controlRadius);
         }
 
-        // Punto blanco estelar en la pista activa.
+        // Starlight-white dot on the active track.
         if (active)
         {
             g.setColour (theme::accent);
@@ -167,7 +167,7 @@ private:
 
 TrackList::TrackList()
 {
-    header.setText ("Pistas", juce::dontSendNotification);
+    header.setText ("Tracks", juce::dontSendNotification);
     header.setFont (theme::sans (13.0f));
     header.setColour (juce::Label::textColourId, theme::textSecondary);
     addAndMakeVisible (header);
@@ -200,8 +200,8 @@ void TrackList::refresh (const model::Project& project, std::size_t activeIndex)
                          i == activeIndex);
 
     addButton.setEnabled (project.tracks.size() < maxTracks);
-    addButton.setTooltip (project.tracks.size() < maxTracks ? text ("Pista nueva")
-                                                            : text ("Máximo 16 pistas"));
+    addButton.setTooltip (project.tracks.size() < maxTracks ? "New track"
+                                                            : "16 tracks max");
     resized();
 }
 
@@ -234,9 +234,9 @@ void TrackList::showRowMenu (std::size_t index)
     enum { rename = 1, duplicate, remove };
 
     juce::PopupMenu menu;
-    menu.addItem (rename, "Renombrar");
-    menu.addItem (duplicate, "Duplicar", rows.size() < maxTracks);
-    menu.addItem (remove, "Eliminar", rows.size() > 1);
+    menu.addItem (rename, "Rename");
+    menu.addItem (duplicate, "Duplicate", rows.size() < maxTracks);
+    menu.addItem (remove, "Delete", rows.size() > 1);
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (rows[index].get()),
                         [safe = juce::Component::SafePointer<TrackList> (this), index] (int result)

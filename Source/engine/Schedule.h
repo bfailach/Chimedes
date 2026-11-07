@@ -7,22 +7,22 @@
 namespace chimedes::engine
 {
 
-// Una nota (o acorde) que debe sonar dentro de un ciclo.
+// A note (or chord) that has to sound within a cycle.
 struct NoteEvent
 {
-    double startBeat = 0.0;         // relativo al inicio del ciclo
+    double startBeat = 0.0;         // relative to the start of the cycle
     double durationBeats = 1.0;
     std::vector<int> pitches;
     int velocity = 100;
-    model::NodeId node = model::noNode;  // para iluminar el nodo que suena
-    model::InstrumentId instrument = 1;  // ya resuelto: el del nodo o el de la pista
-    model::NodeId from = model::noNode;  // nodo desde el que se llegó (para animar la arista)
+    model::NodeId node = model::noNode;  // to light up the node that is sounding
+    model::InstrumentId instrument = 1;  // already resolved: the node's or the track's
+    model::NodeId from = model::noNode;  // node we arrived from (to animate the edge)
 };
 
-// Horario inmutable de una pista: lo único que lee el hilo de audio.
+// Immutable schedule of a track: the only thing the audio thread reads.
 struct Schedule
 {
-    std::vector<NoteEvent> events;  // ordenados por startBeat
+    std::vector<NoteEvent> events;  // sorted by startBeat
     double cycleLengthBeats = 0.0;
 };
 

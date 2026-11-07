@@ -26,8 +26,8 @@ void applyDarkTitleBar ([[maybe_unused]] juce::Component& window)
 
     auto* hwnd = static_cast<HWND> (peer->getNativeHandle());
 
-    // Constantes de DWM por número: los SDK antiguos no tienen sus nombres.
-    constexpr DWORD useImmersiveDarkMode = 20;  // Windows 10 (2004) y posteriores
+    // DWM constants by number: older SDKs do not have their names.
+    constexpr DWORD useImmersiveDarkMode = 20;  // Windows 10 (2004) and later
     constexpr DWORD captionColour = 35;         // Windows 11
     constexpr DWORD textColour = 36;            // Windows 11
 
@@ -38,7 +38,7 @@ void applyDarkTitleBar ([[maybe_unused]] juce::Component& window)
     const COLORREF caption = toColorRef (theme::background);
     const COLORREF text = toColorRef (theme::textPrimary);
 
-    // En Windows 10 estas dos fallan sin más; queda el modo oscuro del sistema.
+    // On Windows 10 these two simply fail; the system dark mode remains.
     DwmSetWindowAttribute (hwnd, captionColour, &caption, sizeof (caption));
     DwmSetWindowAttribute (hwnd, textColour, &text, sizeof (text));
    #endif

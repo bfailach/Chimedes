@@ -13,19 +13,19 @@ struct ValidationResult
     {
         None,
         NoNodes,
-        MissingStart,       // no hay nodo de inicio o no existe
-        MissingEnd,         // no hay nodo de fin o no existe
-        Unreachable         // algún nodo no es alcanzable desde el inicio
+        MissingStart,       // no start node, or it does not exist
+        MissingEnd,         // no end node, or it does not exist
+        Unreachable         // some node cannot be reached from the start
     };
 
     Problem problem = Problem::None;
-    std::vector<model::NodeId> unreachable;  // ordenados por id
+    std::vector<model::NodeId> unreachable;  // sorted by id
 
     bool ok() const noexcept { return problem == Problem::None; }
 };
 
-// Comprueba que la pista se puede reproducir: inicio y fin definidos y todo
-// nodo alcanzable desde el inicio, respetando la dirección en grafos dirigidos.
+// Checks that the track can be played: start and end set, and every node
+// reachable from the start, following edge direction in directed graphs.
 ValidationResult validate (const model::Track& track);
 
 } // namespace chimedes::engine

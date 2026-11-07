@@ -7,8 +7,8 @@
 namespace chimedes::model
 {
 
-// Formato de archivo de Chimedes (.chimedes): JSON legible, con las opciones como
-// palabras ("timeline", "bfs"...) en lugar de números.
+// Chimedes file format (.chimedes): readable JSON, with options written as
+// words ("timeline", "bfs"...) instead of numbers.
 //
 // {
 //   "format": "chimedes", "version": 1, "bpm": 120,
@@ -18,9 +18,9 @@ namespace chimedes::model
 //                 "edges": [ { "id": 1, "from": 1, "to": 2 } ] } ]
 // }
 //
-// Al leer, los campos que falten toman su valor por defecto, los valores fuera de
-// rango se ajustan y las aristas hacia nodos que no existen se descartan: un archivo
-// editado a mano no debe dejar la app en un estado imposible.
+// When reading, missing fields take their default value, out-of-range values are
+// clamped and edges to nodes that do not exist are dropped: a hand-edited file
+// must never leave the app in an impossible state.
 
 inline constexpr const char* projectFileExtension = ".chimedes";
 inline constexpr int currentProjectFormatVersion = 1;
@@ -30,7 +30,7 @@ std::string projectToJson (const Project& project);
 struct ProjectLoadResult
 {
     bool ok = false;
-    std::string error;   // en español, para mostrarlo tal cual
+    std::string error;   // ready to show to the user as is
     Project project;
 };
 

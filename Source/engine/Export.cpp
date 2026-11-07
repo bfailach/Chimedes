@@ -16,7 +16,7 @@ namespace
 {
     constexpr int ticksPerBeat = 480;
 
-    // Horarios de las pistas que suenan, con su pista.
+    // Schedules of the tracks that sound, with their track.
     std::vector<std::pair<const model::Track*, Schedule>> soundingTracks (const model::Project& project)
     {
         std::vector<std::pair<const model::Track*, Schedule>> out;
@@ -31,19 +31,19 @@ namespace
         return out;
     }
 
-    // Programa General MIDI parecido a cada instrumento integrado.
+    // General MIDI program close to each built-in instrument.
     int gmProgram (model::InstrumentId id)
     {
         namespace ids = model::instruments;
         switch (id)
         {
-            case ids::organ:         return 16;  // órgano de barras
-            case ids::electricPiano: return 4;   // piano eléctrico 1
-            case ids::bell:          return 14;  // campanas tubulares
-            case ids::pluck:         return 24;  // guitarra de nailon
-            case ids::pad:           return 89;  // pad cálido
-            case ids::bass:          return 33;  // bajo eléctrico (dedos)
-            default:                 return -1;  // muestras: sin cambio de programa
+            case ids::organ:         return 16;  // drawbar organ
+            case ids::electricPiano: return 4;   // electric piano 1
+            case ids::bell:          return 14;  // tubular bells
+            case ids::pluck:         return 24;  // nylon guitar
+            case ids::pad:           return 89;  // warm pad
+            case ids::bass:          return 33;  // electric bass (finger)
+            default:                 return -1;  // samples: no program change
         }
     }
 
@@ -68,11 +68,11 @@ namespace
         }
     };
 
-    // Un evento de una pista MIDI, en ticks absolutos.
+    // An event in a MIDI track, in absolute ticks.
     struct MidiEvent
     {
         std::uint32_t tick;
-        int order;                 // a igual tick: primero los note-off, luego los note-on
+        int order;                 // same tick: note-offs first, then note-ons
         std::vector<std::uint8_t> data;
     };
 
@@ -92,7 +92,7 @@ namespace
             chunk.bytes.insert (chunk.bytes.end(), e.data.begin(), e.data.end());
         }
 
-        // Fin de pista.
+        // End of track.
         chunk.varLen (endTick > last ? endTick - last : 0);
         chunk.u8 (0xff); chunk.u8 (0x2f); chunk.u8 (0x00);
 
@@ -116,8 +116,8 @@ namespace
 
 int midiChannelFor (model::InstrumentId instrument) noexcept
 {
-    // Instrumento 1..9 → canales 1..9; 10..15 → 11..16; el 16 comparte el canal 16.
-    // (En base cero: 0..8 y 10..15; el 9 es la percusión de General MIDI.)
+    // Instrument 1..9 → channels 1..9; 10..15 → 11..16; 16 shares channel 16.
+    // (Zero-based: 0..8 and 10..15; 9 is General MIDI percussion.)
     const auto id = std::clamp (static_cast<int> (instrument), 1, 16);
     return id <= 9 ? id - 1 : std::min (id, 15);
 }
@@ -135,8 +135,8 @@ double exportLengthBeats (const model::Project& project, int cycles, double maxB
     if (cycles > 0)
         return std::min (longest * cycles, maxBeats);
 
-    // Mínimo común múltiplo en ticks; si se pasa del máximo, tantas vueltas de la más
-    // larga como quepan.
+    // Least common multiple in ticks; if it goes over the maximum, as many loops of the
+    // longest track as fit.
     const auto maxTicks = static_cast<std::uint64_t> (maxBeats * ticksPerBeat);
     std::uint64_t lcm = 1;
     for (const auto& [t, s] : tracks)
@@ -158,11 +158,11 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
     Writer file;
     file.text ("MThd");
     file.u32 (6);
-    file.u16 (1);                                        // formato 1: pistas simultáneas
-    file.u16 (static_cast<int> (tracks.size()) + 1);     // + pista de tempo
+    file.u16 (1);                                        // format 1: simultaneous tracks
+    file.u16 (static_cast<int> (tracks.size()) + 1);     // + tempo track
     file.u16 (ticksPerBeat);
 
-    // Pista de tempo: compás 4/4 y el BPM del proyecto.
+    // Tempo track: 4/4 time and the project's BPM.
     {
         std::vector<MidiEvent> events;
         events.push_back (metaText (0x03, "Chimedes"));
@@ -179,9 +179,9 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
     for (const auto& [track, schedule] : tracks)
     {
         std::vector<MidiEvent> events;
-        events.push_back (metaText (0x03, track->name.empty() ? std::string ("Pista") : track->name));
+        events.push_back (metaText (0x03, track->name.empty() ? std::string ("Track") : track->name));
 
-        // Cambio de programa al principio en cada canal de instrumento integrado.
+        // Program change at the start on every built-in instrument channel.
         std::set<std::pair<int, int>> programs;
         for (const auto& e : schedule.events)
             if (const auto program = gmProgram (e.instrument); program >= 0)
@@ -189,7 +189,7 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
         for (const auto& [channel, program] : programs)
             events.push_back ({ 0, -1, { static_cast<std::uint8_t> (0xc0 | channel), static_cast<std::uint8_t> (program) } });
 
-        // Las vueltas del ciclo que caben en la duración; las notas se cortan al final.
+        // The cycle loops that fit in the length; notes are cut at the end.
         struct Note { std::uint32_t start, end; int channel, pitch, velocity; };
         std::vector<Note> notes;
 
@@ -206,8 +206,8 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
                                        midiChannelFor (e.instrument), std::clamp (pitch, 0, 127), std::clamp (e.velocity, 1, 127) });
             }
 
-        // La misma nota en el mismo canal no puede solaparse en MIDI: la anterior
-        // termina cuando empieza la siguiente.
+        // The same note on the same channel cannot overlap in MIDI: the previous one
+        // ends when the next one starts.
         std::sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b)
         {
             return std::tie (a.channel, a.pitch, a.start) < std::tie (b.channel, b.pitch, b.start);
@@ -216,7 +216,7 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
             if (notes[i].channel == notes[i + 1].channel && notes[i].pitch == notes[i + 1].pitch)
                 notes[i].end = std::min (notes[i].end, std::max (notes[i].start + 1, notes[i + 1].start));
 
-        // Notas repetidas en el mismo instante (dos nodos iguales a la vez): una sola.
+        // Repeated notes at the same instant (two identical nodes at once): keep one.
         notes.erase (std::unique (notes.begin(), notes.end(), [] (const Note& a, const Note& b)
         {
             return a.channel == b.channel && a.pitch == b.pitch && a.start == b.start;

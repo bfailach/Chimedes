@@ -17,17 +17,17 @@ namespace
     }
 }
 
-TEST ("proyecto: guardar y abrir devuelve exactamente lo mismo")
+TEST ("project: saving and opening gives back exactly the same")
 {
     auto demo = model::makeDemoTrack();
-    demo.name = "Órbita \"lenta\"\ncon salto";
+    demo.name = "Slow \"orbit\"\nwith a break and ñ";
     demo.mode = model::PlaybackMode::Algorithm;
     demo.treeMethod = model::TreeMethod::Dijkstra;
     demo.traversal = model::Traversal::DFS;
     demo.siblings = model::SiblingMode::Simultaneous;
     demo.quantizeBeats = 0.25;
     demo.instrument = 4;
-    demo.nodes[1].x = 123.456789;   // decimales: deben volver idénticos
+    demo.nodes[1].x = 123.456789;   // decimals: must come back identical
     demo.nodes[1].instrument = 2;
 
     const auto loaded = model::projectFromJson (model::projectToJson (projectWith (demo, 97.5)));
@@ -37,7 +37,7 @@ TEST ("proyecto: guardar y abrir devuelve exactamente lo mismo")
     CHECK (loaded.project.tracks[0] == demo);
 }
 
-TEST ("proyecto: grafos aleatorios sobreviven a guardar y abrir")
+TEST ("project: random graphs survive saving and opening")
 {
     for (std::uint32_t seed = 1; seed <= 50; ++seed)
     {
@@ -52,7 +52,7 @@ TEST ("proyecto: grafos aleatorios sobreviven a guardar y abrir")
     }
 }
 
-TEST ("proyecto: los campos que faltan toman su valor por defecto")
+TEST ("project: missing fields take their default value")
 {
     const auto loaded = model::projectFromJson (R"({ "format": "chimedes", "tracks": [ { "nodes": [ { "id": 3 } ] } ] })");
     CHECK (loaded.ok);
@@ -67,12 +67,12 @@ TEST ("proyecto: los campos que faltan toman su valor por defecto")
     CHECK (t.nodes[0].velocity == 100);
 }
 
-TEST ("proyecto: se descartan aristas imposibles y se ajustan valores fuera de rango")
+TEST ("project: impossible edges are dropped and out-of-range values clamped")
 {
     const auto loaded = model::projectFromJson (R"({
         "format": "chimedes", "version": 1, "bpm": 9000,
         "tracks": [ {
-            "directed": false, "mode": "inventado", "start": 1, "end": 99,
+            "directed": false, "mode": "made-up", "start": 1, "end": 99,
             "nodes": [ { "id": 1, "pitches": [200, -5, 60, 60], "velocity": 500 },
                        { "id": 2 }, { "id": 2 } ],
             "edges": [ { "from": 1, "to": 2 }, { "from": 2, "to": 1 }, { "from": 1, "to": 1 },
@@ -83,33 +83,33 @@ TEST ("proyecto: se descartan aristas imposibles y se ajustan valores fuera de r
     CHECK (loaded.project.bpm == 400.0);
 
     const auto& t = loaded.project.tracks[0];
-    CHECK (t.mode == model::PlaybackMode::Timeline);        // palabra desconocida
+    CHECK (t.mode == model::PlaybackMode::Timeline);        // unknown word
     CHECK (t.nodes.size() == 3);
     CHECK (t.nodes[0].pitches == (std::vector<int> { 0, 60, 127 }));
     CHECK (t.nodes[0].velocity == 127);
-    CHECK (t.nodes[2].id != 2);                             // id repetido: recibe otro
-    CHECK (t.edges.size() == 1);                            // la inversa, el bucle y la rota fuera
+    CHECK (t.nodes[2].id != 2);                             // repeated id: gets another
+    CHECK (t.edges.size() == 1);                            // the reverse, the loop and the broken one out
     CHECK (t.startNode == 1);
-    CHECK (t.endNode == model::noNode);                     // el nodo 99 no existe
+    CHECK (t.endNode == model::noNode);                     // node 99 does not exist
 }
 
-TEST ("proyecto: errores claros al abrir algo que no es un proyecto")
+TEST ("project: clear errors when opening something that is not a project")
 {
     const auto broken = model::projectFromJson ("{\n  \"format\": \"chimedes\",\n  \"bpm\": ,\n}");
     CHECK (! broken.ok);
-    CHECK (broken.error.find ("dañado") != std::string::npos);
-    CHECK (broken.error.find ("línea 3") != std::string::npos);
+    CHECK (broken.error.find ("damaged") != std::string::npos);
+    CHECK (broken.error.find ("line 3") != std::string::npos);
 
     CHECK (! model::projectFromJson (R"({ "bpm": 120 })").ok);
-    CHECK (! model::projectFromJson ("hola").ok);
+    CHECK (! model::projectFromJson ("hello").ok);
     CHECK (! model::projectFromJson ("").ok);
 
     const auto newer = model::projectFromJson (R"({ "format": "chimedes", "version": 99 })");
     CHECK (! newer.ok);
-    CHECK (newer.error.find ("más nueva") != std::string::npos);
+    CHECK (newer.error.find ("newer") != std::string::npos);
 }
 
-TEST ("proyecto: un archivo sin pistas abre con una pista vacía")
+TEST ("project: a file without tracks opens with one empty track")
 {
     const auto loaded = model::projectFromJson (R"({ "format": "chimedes", "tracks": [] })");
     CHECK (loaded.ok);
@@ -117,7 +117,7 @@ TEST ("proyecto: un archivo sin pistas abre con una pista vacía")
     CHECK (loaded.project.tracks[0].nodes.empty());
 }
 
-TEST ("proyecto: varias pistas se guardan y abren en orden, con nombre y silencio")
+TEST ("project: several tracks are saved and opened in order, with name and mute")
 {
     model::Project p;
     p.bpm = 140.0;
@@ -126,7 +126,7 @@ TEST ("proyecto: varias pistas se guardan y abren en orden, con nombre y silenci
     {
         model::Track t;
         t.id = i * 10;
-        t.name = "Pista " + std::to_string (i);
+        t.name = "Track " + std::to_string (i);
         t.instrument = i;
         t.muted = i == 3;
         model::randomizeGraph (t, i);
@@ -140,13 +140,13 @@ TEST ("proyecto: varias pistas se guardan y abren en orden, con nombre y silenci
     CHECK (loaded.project.tracks[2].muted);
 }
 
-TEST ("proyecto: las muestras se guardan y abren; las inválidas se descartan")
+TEST ("project: samples are saved and opened; invalid ones are dropped")
 {
     model::Project p;
     p.tracks = { model::makeDemoTrack() };
     p.tracks[0].instrument = 7;
-    p.samples = { { 7, "Kalimba \"suave\"", "sonidos/kalimba.wav", 62 },
-                  { 9, "Voz", "C:\\Users\\bryan\\voz.wav", 60 } };
+    p.samples = { { 7, "Soft \"kalimba\"", "sounds/kalimba.wav", 62 },
+                  { 9, "Voice", "C:\\Users\\bryan\\voice.wav", 60 } };
 
     const auto loaded = model::projectFromJson (model::projectToJson (p));
     CHECK (loaded.ok);
@@ -157,12 +157,12 @@ TEST ("proyecto: las muestras se guardan y abren; las inválidas se descartan")
         { "id": 3, "path": "a.wav" }, { "id": 8, "path": "" }, { "id": 8, "path": "b.wav", "root": 300 },
         { "id": 8, "path": "c.wav" } ] })");
     CHECK (messy.ok);
-    CHECK (messy.project.samples.size() == 1);   // id 3 es integrado, sin ruta, repetido
+    CHECK (messy.project.samples.size() == 1);   // id 3 is built-in, no path, repeated
     CHECK (messy.project.samples[0].path == "b.wav");
     CHECK (messy.project.samples[0].rootNote == 127);
 }
 
-TEST ("proyecto: sin muestras, el archivo no lleva la sección")
+TEST ("project: without samples, the file has no samples section")
 {
     model::Project p;
     p.tracks = { model::makeDemoTrack() };

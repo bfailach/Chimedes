@@ -9,7 +9,7 @@ namespace chimedes::model
 
 namespace
 {
-    // Semitono de cada letra respecto a C.
+    // Semitone of each letter relative to C.
     int letterSemitone (char letter)
     {
         switch (std::toupper (static_cast<unsigned char> (letter)))
@@ -33,7 +33,7 @@ std::optional<int> parsePitch (const std::string& text)
     if (text.empty())
         return std::nullopt;
 
-    // Número MIDI directo.
+    // Plain MIDI number.
     if (std::isdigit (static_cast<unsigned char> (text[0])))
     {
         std::size_t used = 0;

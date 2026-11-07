@@ -8,9 +8,9 @@
 namespace chimedes::model
 {
 
-// Instrumentos: seis integrados (sintetizados) y hasta diez muestras cargadas por el
-// usuario. El id de cada instrumento es también su canal MIDI en el motor de audio
-// (1..16): integrados del 1 al 6, muestras del 7 al 16.
+// Instruments: six built-in (synthesized) and up to ten samples loaded by the
+// user. Each instrument's id is also its MIDI channel in the audio engine
+// (1..16): built-ins 1 to 6, samples 7 to 16.
 namespace instruments
 {
     inline constexpr InstrumentId organ        = 1;
@@ -24,9 +24,9 @@ namespace instruments
     inline constexpr InstrumentId last = bass;
     inline constexpr int count = static_cast<int> (last);
 
-    // Nombres en UTF-8, en el orden de los ids.
+    // Display names, in id order.
     inline constexpr std::array<const char*, count> names {
-        "Órgano", "Piano eléctrico", "Campana", "Cuerda pulsada", "Pad", "Bajo"
+        "Organ", "Electric piano", "Bell", "Plucked string", "Pad", "Bass"
     };
 
     inline constexpr InstrumentId firstSample = 7;
@@ -37,7 +37,7 @@ namespace instruments
     inline constexpr bool isSample (InstrumentId id) noexcept  { return id >= firstSample && id <= lastSample; }
     inline constexpr bool isValid (InstrumentId id) noexcept   { return isBuiltIn (id) || isSample (id); }
 
-    // Nombre de un instrumento integrado (las muestras tienen el suyo, ver displayName).
+    // Name of a built-in instrument (samples have their own, see instrumentDisplayName).
     inline const char* name (InstrumentId id) noexcept
     {
         return isBuiltIn (id) ? names[static_cast<std::size_t> (id - 1)] : names[0];
@@ -52,7 +52,7 @@ inline const Sample* findSample (const Project& project, InstrumentId id) noexce
     return nullptr;
 }
 
-// Nombre para mostrar: el del instrumento integrado o el de la muestra.
+// Display name: the built-in instrument's or the sample's.
 inline std::string instrumentDisplayName (const Project& project, InstrumentId id)
 {
     if (instruments::isBuiltIn (id))
@@ -62,7 +62,7 @@ inline std::string instrumentDisplayName (const Project& project, InstrumentId i
     return instruments::name (instruments::organ);
 }
 
-// Primer id de muestra libre, o 0 si ya hay diez.
+// First free sample id, or 0 if there are already ten.
 inline InstrumentId freeSampleId (const Project& project) noexcept
 {
     for (auto id = instruments::firstSample; id <= instruments::lastSample; ++id)
@@ -71,7 +71,7 @@ inline InstrumentId freeSampleId (const Project& project) noexcept
     return 0;
 }
 
-// El instrumento que suena para un nodo: el suyo propio o, si no tiene, el de la pista.
+// The instrument a node plays with: its own or, if it has none, the track's.
 inline InstrumentId resolveInstrument (const Track& track, const Node& node) noexcept
 {
     if (instruments::isValid (node.instrument))

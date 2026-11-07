@@ -9,50 +9,50 @@
 namespace chimedes::ui
 {
 
-// Teclado de piano de dos octavas para elegir las notas de un nodo.
+// Two-octave piano keyboard to choose a node's notes.
 //
-// Tocar una tecla la hace sonar y la deja como propuesta; Enter la guarda en el
-// nodo y Esc la descarta. Así se puede probar antes de decidir.
-//   clic ..................... propone esa nota sola
-//   Mayús + clic ............. añade o quita la nota del acorde propuesto
-//   letras del teclado ....... A W S E D F T G Y H U J K O L P, de do a re# de la
-//                              octava siguiente, empezando en el primer do visible.
-//                              Varias teclas a la vez forman un acorde; Mayús + letra
-//                              añade o quita la nota, como con el ratón.
-//   Z / X, < > ............... octava abajo / arriba
-//   Enter / Esc .............. guardar / descartar la propuesta
+// Playing a key makes it sound and leaves it as a proposal; Enter saves it to the
+// node and Esc discards it. So you can try before deciding.
+//   click .................... proposes that single note
+//   Shift + click ............ adds or removes the note from the proposed chord
+//   computer keys ............ A W S E D F T G Y H U J K O L P, from C to the D# of
+//                              the next octave, starting at the first visible C.
+//                              Several keys at once make a chord; Shift + letter
+//                              adds or removes the note, as with the mouse.
+//   Z / X, < > ............... octave down / up
+//   Enter / Esc .............. save / discard the proposal
 class PianoPicker : public juce::Component
 {
 public:
     PianoPicker();
 
-    // Se llama al guardar (Enter) con las notas, ordenadas de grave a agudo.
+    // Called on save (Enter) with the notes, sorted from low to high.
     std::function<void (std::vector<int>)> onCommit;
 
-    // Una tecla empieza (true) o deja de sonar (false).
+    // A key starts (true) or stops (false) sounding.
     std::function<void (int pitch, bool isDown)> onAudition;
 
-    // La propuesta cambió (para mostrar sus nombres y la ayuda de Enter / Esc).
+    // The proposal changed (to show its names and the Enter / Esc hint).
     std::function<void()> onPendingChanged;
 
-    // Notas guardadas del nodo. Si cambian, la propuesta se descarta; si son las
-    // mismas (la pista se refrescó por otra edición), la propuesta se conserva.
-    // Si la más grave queda fuera de vista, mueve el teclado a ella.
+    // The node's saved notes. If they change, the proposal is discarded; if they are
+    // the same (the track was refreshed by another edit), the proposal is kept.
+    // If the lowest one is out of view, the keyboard moves to it.
     void setPitches (const std::vector<int>& pitches);
 
-    // La propuesta actual (igual a las guardadas si no hay ninguna).
+    // The current proposal (equal to the saved notes if there is none).
     const std::vector<int>& getPendingPitches() const noexcept { return pending; }
     bool hasPendingChange() const noexcept { return pending != saved; }
 
     void commitPending();
     void discardPending();
 
-    // Teclado de la computadora. La ventana se las pasa mientras el panel muestra un
-    // nodo; devuelven true si la tecla era suya.
+    // Computer keyboard. The window passes keys on while the panel shows a node;
+    // they return true if the key was theirs.
     bool handleKeyPress (const juce::KeyPress& key);
     bool handleKeyStateChange();
 
-    // Apaga las notas que estén sonando (al perder el foco, al cambiar de nodo...).
+    // Turns off the notes that are sounding (on focus loss, on node change...).
     void releaseAllKeys();
 
     void paint (juce::Graphics& g) override;
@@ -63,7 +63,7 @@ public:
     void mouseExit (const juce::MouseEvent& e) override;
 
 private:
-    static constexpr int whiteKeysShown = 14;  // dos octavas
+    static constexpr int whiteKeysShown = 14;  // two octaves
     static constexpr int headerHeight = 24;
 
     int lowestPitch() const noexcept { return (baseOctave + 1) * 12; }
@@ -73,20 +73,20 @@ private:
     void setBaseOctave (int octave);
     void updateRangeLabel();
 
-    // Una tecla nueva se toca: suena y cambia la propuesta.
-    //   asChord: se suma al acorde (otras teclas sostenidas);  toggle: Mayús.
+    // A new key is played: it sounds and changes the proposal.
+    //   asChord: added to the chord (other keys held);  toggle: Shift.
     void playKey (int pitch, bool asChord, bool toggle);
     void setPending (std::vector<int> next);
 
     static bool isBlack (int pitch) noexcept;
 
-    std::vector<int> saved;     // las notas del nodo
-    std::vector<int> pending;   // la propuesta (lo que se ve y se guarda con Enter)
-    int baseOctave = 3;         // el teclado empieza en C3
+    std::vector<int> saved;     // the node's notes
+    std::vector<int> pending;   // the proposal (what is shown and saved with Enter)
+    int baseOctave = 3;         // the keyboard starts at C3
 
-    int mousePitch = -1;            // tecla sostenida con el ratón
-    std::set<int> heldKeyCodes;     // letras sostenidas
-    std::set<int> soundingPitches;  // notas de prueba sonando, para apagarlas
+    int mousePitch = -1;            // key held with the mouse
+    std::set<int> heldKeyCodes;     // letters held down
+    std::set<int> soundingPitches;  // preview notes sounding, to turn them off
 
     juce::TextButton downButton { "<" }, upButton { ">" };
     juce::Label rangeLabel;

@@ -11,12 +11,12 @@ namespace chimedes::engine
 struct Neighbor
 {
     model::NodeId node = model::noNode;
-    double length = 0.0;            // píxeles
+    double length = 0.0;            // pixels
 };
 
-// Lista de vecinos de cada nodo. En grafos dirigidos solo sigue la dirección
-// de las aristas; en no dirigidos, ambas. Cada lista está ordenada de la arista
-// más corta a la más larga (empates por id), para que todo sea determinista.
+// Neighbour list for each node. In directed graphs it only follows the edge
+// direction; in undirected graphs, both. Each list is sorted from the shortest
+// edge to the longest (ties by id), so everything is deterministic.
 using Adjacency = std::unordered_map<model::NodeId, std::vector<Neighbor>>;
 
 Adjacency buildAdjacency (const model::Track& track);

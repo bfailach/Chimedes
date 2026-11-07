@@ -5,7 +5,7 @@
 namespace chimedes::ui
 {
 
-// Tema visual de Chimedes: controles planos, esquinas redondeadas y grises neutros.
+// Chimedes visual theme: flat controls, rounded corners and neutral greys.
 class ChimedesLookAndFeel : public juce::LookAndFeel_V4
 {
 public:

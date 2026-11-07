@@ -17,11 +17,11 @@ namespace chimedes::ui
 
 namespace
 {
-    constexpr int margin = 24;          // separación de los paneles flotantes al borde
+    constexpr int margin = 24;          // gap between the floating panels and the edge
     constexpr int inspectorWidth = 270;
     constexpr int barHeight = 52;
     constexpr int topBarHeight = 44;
-    constexpr int topBarY = GraphView::rulerHeight + 10;   // debajo de la regla de tiempo
+    constexpr int topBarY = GraphView::rulerHeight + 10;   // below the time ruler
 
     juce::String describe (const engine::ScheduleResult& result)
     {
@@ -31,26 +31,26 @@ namespace
         switch (result.error)
         {
             case Error::None:            return {};
-            case Error::EndBeforeStart:  return text ("El nodo de fin está a la izquierda del de inicio");
-            case Error::TreeUnavailable: return "Prim solo funciona en grafos no dirigidos";
+            case Error::EndBeforeStart:  return "The end node is to the left of the start node";
+            case Error::TreeUnavailable: return "Prim only works on undirected graphs";
             case Error::Invalid:
                 switch (result.validation.problem)
                 {
-                    case Problem::NoNodes:      return "La pista no tiene nodos";
-                    case Problem::MissingStart: return "Falta el nodo de inicio (clic derecho en un nodo)";
-                    case Problem::MissingEnd:   return "Falta el nodo de fin (clic derecho en un nodo)";
-                    case Problem::Unreachable:  return "Hay nodos inalcanzables desde el inicio (en naranja)";
+                    case Problem::NoNodes:      return "The track has no nodes";
+                    case Problem::MissingStart: return "The start node is missing (right-click a node)";
+                    case Problem::MissingEnd:   return "The end node is missing (right-click a node)";
+                    case Problem::Unreachable:  return "Some nodes cannot be reached from the start (in orange)";
                     case Problem::None:         break;
                 }
                 break;
         }
 
-        return "La pista no se puede reproducir";
+        return "The track cannot be played";
     }
 }
 
-// Una entrada de deshacer: el proyecto antes y después del cambio, y qué pista
-// estaba activa en cada momento (deshacer vuelve a mostrar la pista afectada).
+// An undo entry: the project before and after the change, and which track was
+// active at each point (undo shows the affected track again).
 class MainComponent::ProjectChange : public juce::UndoableAction
 {
 public:
@@ -74,7 +74,7 @@ namespace
     {
         model::Project p;
         auto demo = model::makeDemoTrack();
-        demo.name = "Pista 1";
+        demo.name = "Track 1";
         p.tracks = { demo };
         return p;
     }
@@ -87,12 +87,12 @@ namespace
         return id;
     }
 
-    // Nombre libre del estilo "Pista 3".
+    // A free name such as "Track 3".
     std::string nextTrackName (const model::Project& p)
     {
         for (int n = static_cast<int> (p.tracks.size()) + 1;; ++n)
         {
-            const auto name = "Pista " + std::to_string (n);
+            const auto name = "Track " + std::to_string (n);
             if (std::none_of (p.tracks.begin(), p.tracks.end(), [&name] (const model::Track& t) { return t.name == name; }))
                 return name;
         }
@@ -102,7 +102,7 @@ namespace
 MainComponent::MainComponent()
     : project (makeDemoProject())
 {
-    // --- Transporte --------------------------------------------------------
+    // --- Transport ---------------------------------------------------------
     playButton.onClick = [this] { engine.play(); };
     pauseButton.onClick = [this] { engine.pause(); };
     stopButton.onClick = [this] { engine.stop(); };
@@ -122,7 +122,7 @@ MainComponent::MainComponent()
     openButton.onClick = [this] { openProject(); };
     saveButton.onClick = [this] { saveProject(); };
     exportButton.onClick = [this] { showExportMenu(); };
-    randomButton.setTooltip (text ("Aleatorio: grafo, notas, ritmo, instrumentos o algoritmo"));
+    randomButton.setTooltip ("Random: graph, notes, rhythm, instruments or algorithm");
     randomButton.onClick = [this] { showRandomMenu(); };
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
@@ -131,7 +131,7 @@ MainComponent::MainComponent()
     statusLabel.setFont (juce::FontOptions (13.0f));
     statusLabel.setJustificationType (juce::Justification::centred);
 
-    // --- Edición -----------------------------------------------------------
+    // --- Editing -----------------------------------------------------------
     const EditCallbacks editCallbacks {
         [this] (const EditCallbacks::Change& c) { applyEdit (c); },
         [this] { beginGesture(); },
@@ -144,11 +144,11 @@ MainComponent::MainComponent()
     graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (activeTrack(), node); };
     graphView.onActivateTrack = [this] (std::size_t index) { setActiveTrack (index); };
 
-    // --- Muestras ----------------------------------------------------------
+    // --- Samples -----------------------------------------------------------
     formatManager.registerBasicFormats();
     inspector.onLoadSample = [this] (bool forNode) { loadSample (forNode); };
 
-    // --- Pistas ------------------------------------------------------------
+    // --- Tracks ------------------------------------------------------------
     trackList.onSelect = [this] (std::size_t i) { setActiveTrack (i); };
     trackList.onAdd = [this] { addTrack(); };
     trackList.onDuplicate = [this] (std::size_t i) { duplicateTrack (i); };
@@ -162,7 +162,7 @@ MainComponent::MainComponent()
         applyProjectEdit ([i, n = name.toStdString()] (model::Project& p) { p.tracks[i].name = n; });
     };
 
-    // Notas de prueba del teclado del panel: suenan al momento, aunque no se reproduzca.
+    // Preview notes from the panel's keyboard: they sound right away, even when not playing.
     inspector.onAudition = [this] (int pitch, int velocity, int instrument)
     {
         if (velocity > 0)
@@ -171,14 +171,14 @@ MainComponent::MainComponent()
             engine.previewNoteOff (pitch, instrument);
     };
 
-    // El lienzo ocupa toda la ventana; los paneles flotan encima.
+    // The canvas fills the whole window; the panels float on top.
     addAndMakeVisible (graphView);
     addAndMakeVisible (inspector);
     addAndMakeVisible (trackList);
     addAndMakeVisible (topBar);
     addAndMakeVisible (bottomBar);
 
-    // Barra superior: acciones de archivo y el nombre del proyecto.
+    // Top bar: file actions and the project name.
     projectLabel.setColour (juce::Label::textColourId, theme::textPrimary);
     projectLabel.setFont (theme::sans (13.0f));
     projectLabel.setInterceptsMouseClicks (false, false);
@@ -197,16 +197,16 @@ MainComponent::MainComponent()
     audioPlayer.setSource (&engine);
     deviceManager.addAudioCallback (&audioPlayer);
 
-    // El transporte avanza con el audio: sin dispositivo, la reproducción no se mueve.
+    // The transport moves with the audio: without a device, playback does not move.
     if (audioError.isNotEmpty())
-        audioWarning = "Sin audio: " + audioError;
+        audioWarning = "No audio: " + audioError;
     else if (deviceManager.getCurrentAudioDevice() == nullptr)
-        audioWarning = text ("No se encontró ningún dispositivo de salida de audio");
+        audioWarning = "No audio output device was found";
 
     undoManager.addChangeListener (this);
     projectChanged();
     updateUndoButtons();
-    markSaved();   // el grafo de demostración no cuenta como cambio sin guardar
+    markSaved();   // the demo graph does not count as an unsaved change
 
     setWantsKeyboardFocus (true);
     setSize (1440, 900);
@@ -222,7 +222,7 @@ MainComponent::~MainComponent()
 }
 
 // ---------------------------------------------------------------------------
-// Cambios a la pista
+// Track changes
 // ---------------------------------------------------------------------------
 
 void MainComponent::applyEdit (const EditCallbacks::Change& change)
@@ -275,7 +275,7 @@ void MainComponent::endGesture()
     if (before == project)
         return;
 
-    // El cambio ya está aplicado; la acción solo lo registra para deshacer.
+    // The change is already applied; the action only records it for undo.
     undoManager.beginNewTransaction();
     undoManager.perform (new ProjectChange (*this, std::move (before), active, project, active));
 }
@@ -287,10 +287,10 @@ void MainComponent::setProject (const model::Project& newProject, std::size_t ne
                            || newActive >= newProject.tracks.size()
                            || project.tracks[newActive].id != newProject.tracks[newActive].id;
 
-    // Otra pista: la selección del lienzo era de la anterior. Se limpia antes de
-    // reemplazar el proyecto: el lienzo todavía apunta a las pistas actuales y, si el
-    // vector de pistas cambia de tamaño, esos punteros dejan de ser válidos hasta que
-    // projectChanged() le pase los nuevos.
+    // Another track: the canvas selection belonged to the previous one. It is cleared
+    // before replacing the project: the canvas still points at the current tracks and,
+    // if the track vector changes size, those pointers stay invalid until
+    // projectChanged() hands it the new ones.
     if (trackChanged)
         graphView.selectNode (model::noNode);
 
@@ -307,7 +307,7 @@ void MainComponent::setActiveTrack (std::size_t index)
     if (index >= project.tracks.size() || index == active)
         return;
 
-    // Cambiar de pista no es una edición: no entra en el historial.
+    // Switching tracks is not an edit: it does not go into the history.
     graphView.selectNode (model::noNode);
     active = index;
     projectChanged();
@@ -321,7 +321,7 @@ void MainComponent::projectChanged()
     trackList.refresh (project, active);
     graphView.repaint();
     updateTitle();
-    resized();   // la lista de pistas cambia de alto
+    resized();   // the track list changes height
 }
 
 void MainComponent::addTrack()
@@ -332,7 +332,7 @@ void MainComponent::addTrack()
     model::Track t;
     t.id = nextTrackId (project);
     t.name = nextTrackName (project);
-    // Cada pista nueva con otro instrumento, para distinguirlas al oído.
+    // Each new track gets a different instrument, so they can be told apart by ear.
     t.instrument = static_cast<model::InstrumentId> (static_cast<int> (project.tracks.size()) % model::instruments::count + 1);
     t.mode = activeTrack().mode;
     t.directed = activeTrack().directed;
@@ -348,7 +348,7 @@ void MainComponent::duplicateTrack (std::size_t index)
 
     auto copy = project.tracks[index];
     copy.id = nextTrackId (project);
-    copy.name = (copy.name.empty() ? std::string ("Pista") : copy.name) + " (copia)";
+    copy.name = (copy.name.empty() ? std::string ("Track") : copy.name) + " (copy)";
 
     applyProjectEdit ([index, copy] (model::Project& p)
     {
@@ -361,7 +361,7 @@ void MainComponent::deleteTrack (std::size_t index)
     if (project.tracks.size() <= 1 || index >= project.tracks.size())
         return;
 
-    // Se puede deshacer, así que no hace falta preguntar.
+    // It can be undone, so there is no need to ask.
     const auto newActive = index < active ? active - 1 : std::min (active, project.tracks.size() - 2);
     applyProjectEdit ([index] (model::Project& p)
     {
@@ -376,7 +376,7 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
 
 void MainComponent::rebuildSchedules()
 {
-    // Cada pista suena en su propia ranura del motor, con su propio ciclo.
+    // Each track plays in its own engine slot, with its own cycle.
     schedules.assign (project.tracks.size(), nullptr);
     std::vector<GraphView::TrackView> views;
     juce::String problem;
@@ -392,14 +392,14 @@ void MainComponent::rebuildSchedules()
         engine.publishSchedule (static_cast<int> (i), t.muted ? nullptr : schedules[i]);
         views.push_back ({ &t, t.muted ? nullptr : schedules[i], result.validation.unreachable });
 
-        // Avisos: los de la pista activa primero; si no hay, el de otra pista (con su nombre).
+        // Warnings: the active track's first; if none, another track's (with its name).
         const auto issue = t.nodes.empty() || t.muted ? juce::String() : describe (result);
         if (issue.isNotEmpty() && (i == active || problem.isEmpty()))
             problem = i == active ? issue
                                   : juce::String::fromUTF8 (t.name.c_str()) + ": " + issue.substring (0, 1).toLowerCase() + issue.substring (1);
     }
 
-    // Las ranuras que sobran (pistas borradas) se silencian.
+    // Leftover slots (deleted tracks) are silenced.
     for (auto i = static_cast<int> (project.tracks.size()); i < audio::AudioEngine::maxTracks; ++i)
         engine.publishSchedule (i, nullptr);
 
@@ -409,7 +409,7 @@ void MainComponent::rebuildSchedules()
     if (status != statusLabel.getText())
     {
         statusLabel.setText (status, juce::dontSendNotification);
-        resized();   // el aviso aparece, desaparece o cambia de largo
+        resized();   // the warning appears, disappears or changes length
     }
 }
 
@@ -420,7 +420,7 @@ void MainComponent::updateUndoButtons()
 }
 
 // ---------------------------------------------------------------------------
-// Transporte y teclado
+// Transport and keyboard
 // ---------------------------------------------------------------------------
 
 void MainComponent::togglePlayPause()
@@ -433,24 +433,24 @@ void MainComponent::togglePlayPause()
 
 void MainComponent::timerCallback()
 {
-    // Si la app pasa a segundo plano con una tecla sostenida, nunca llegaría su "soltar".
+    // If the app goes to the background with a key held, its "release" would never arrive.
     if (! juce::Process::isForegroundProcess())
         inspector.releasePianoKeys();
 
     graphView.setPlayhead (engine.getPositionBeats(), engine.isPlaying(), engine.getBpm());
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
 
-    // Libera los horarios viejos unas dos veces por segundo.
+    // Frees old schedules about twice a second.
     if (++timerTicks % 15 == 0)
         engine.collectGarbage();
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
-    const auto command = juce::ModifierKeys::commandModifier;  // Ctrl en Windows y Linux, Cmd en macOS
+    const auto command = juce::ModifierKeys::commandModifier;  // Ctrl on Windows and Linux, Cmd on macOS
 
-    // Con un nodo seleccionado, las letras tocan el piano y Enter / Esc guardan o
-    // descartan la nota propuesta.
+    // With a node selected, letters play the piano and Enter / Esc save or
+    // discard the proposed note.
     if (inspector.handlePianoKeyPress (key))
         return true;
 
@@ -489,19 +489,19 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 
 bool MainComponent::keyStateChanged (bool)
 {
-    // Al bajar y al soltar letras: así suenan mientras se sostienen y forman acordes.
+    // On letter press and release: so they sound while held and form chords.
     return inspector.handlePianoKeyStateChange();
 }
 
 void MainComponent::focusLost (FocusChangeType)
 {
-    // Si la ventana pierde el foco con una tecla sostenida, nunca llegaría su "soltar".
+    // If the window loses focus with a key held, its "release" would never arrive.
     if (! hasKeyboardFocus (true))
         inspector.releasePianoKeys();
 }
 
 // ---------------------------------------------------------------------------
-// Distribución
+// Layout
 // ---------------------------------------------------------------------------
 
 void MainComponent::paint (juce::Graphics& g)
@@ -516,7 +516,7 @@ void MainComponent::resized()
 
     area.reduce (margin, margin);
 
-    // Barra superior centrada, del ancho de su contenido: [nuevo, abrir, guardar] nombre •
+    // Top bar, centred and as wide as its content: [new, open, save, export] name •
     {
         constexpr int pad = 8;
         const auto nameWidth = juce::jlimit (60, 320, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
@@ -538,8 +538,8 @@ void MainComponent::resized()
         projectLabel.setBounds (bar);
     }
 
-    // Barra inferior: mide lo justo para su contenido y queda centrada abajo.
-    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio]  [deshacer, rehacer]
+    // Bottom bar: just as wide as its content, centred at the bottom.
+    // [BPM + slider]  [stop, play, pause]  [random]  [undo, redo]
     constexpr int pad = 12;
     constexpr int groupGap = 20;
     constexpr int bpmWidth = 38 + 170;
@@ -561,7 +561,7 @@ void MainComponent::resized()
         pauseButton.setBounds (bar.removeFromLeft (44));
         bar.removeFromLeft (groupGap);
 
-        // Aleatorio; deshacer y rehacer juntos, un poco más separados.
+        // Random; undo and redo together, a little further apart.
         randomButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (14);
         undoButton.setBounds (bar.removeFromLeft (40));
@@ -569,7 +569,7 @@ void MainComponent::resized()
         redoButton.setBounds (bar.removeFromLeft (40));
     }
 
-    // Aviso flotante justo encima de la barra, del largo de su texto.
+    // Floating warning right above the bar, as long as its text.
     area.removeFromBottom (10);
     const auto status = statusLabel.getText();
     statusBar.setVisible (status.isNotEmpty());
@@ -582,7 +582,7 @@ void MainComponent::resized()
         area.removeFromBottom (30);
     }
 
-    // Lista de pistas arriba a la izquierda, alineada con la barra superior.
+    // Track list at the top left, aligned with the top bar.
     {
         constexpr int listWidth = 230;
         const auto top = topBarY;
@@ -590,14 +590,14 @@ void MainComponent::resized()
         trackList.setBounds (area.getX(), top, listWidth, listHeight);
     }
 
-    // La primera vez, el grafo se encuadra en el espacio que dejan libre los paneles.
+    // The first time, the graph is framed in the space the panels leave free.
     if (! initialFitDone && getWidth() > 0 && getHeight() > 0)
     {
         initialFitDone = true;
         graphView.zoomToFit (freeCanvasArea());
     }
 
-    // Panel derecho flotante, centrado en vertical respecto a la ventana, sin pisar la barra.
+    // Floating right panel, vertically centred on the window, clear of the bar.
     area.removeFromBottom (6);
     const auto panelHeight = std::min (inspector.getIdealHeight(), area.getHeight());
     const auto centredTop = (getHeight() - panelHeight) / 2;
@@ -606,7 +606,7 @@ void MainComponent::resized()
 }
 
 // ---------------------------------------------------------------------------
-// Aleatorio
+// Random
 // ---------------------------------------------------------------------------
 
 void MainComponent::showRandomMenu()
@@ -617,16 +617,16 @@ void MainComponent::showRandomMenu()
     const bool empty = activeTrack().nodes.empty();
 
     juce::PopupMenu menu;
-    menu.addSectionHeader (text ("Al azar, en la pista activa"));
-    menu.addItem (graph, text ("Grafo nuevo"));
-    menu.addItem (notes, text ("Notas (misma forma)"), ! empty);
-    menu.addItem (rhythm, text ("Ritmo: duraciones e intensidades"), ! empty);
-    menu.addItem (instruments, text ("Instrumentos"));
-    menu.addItem (algorithm, algorithmMode ? text ("Algoritmo: árbol, recorrido, hermanos")
-                                           : text ("Algoritmo (solo en modo algoritmo)"), algorithmMode);
-    menu.addItem (everything, text ("Todo"));
+    menu.addSectionHeader ("Random, on the active track");
+    menu.addItem (graph, "New graph");
+    menu.addItem (notes, "Notes (same shape)", ! empty);
+    menu.addItem (rhythm, "Rhythm: durations and velocities", ! empty);
+    menu.addItem (instruments, "Instruments");
+    menu.addItem (algorithm, algorithmMode ? "Algorithm: tree, traversal, siblings"
+                                           : "Algorithm (algorithm mode only)", algorithmMode);
+    menu.addItem (everything, "Everything");
     menu.addSeparator();
-    menu.addItem (everythingAllTracks, text ("Todo, en todas las pistas"));
+    menu.addItem (everythingAllTracks, "Everything, on every track");
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&randomButton),
                         [safe = juce::Component::SafePointer<MainComponent> (this)] (int result)
@@ -637,7 +637,7 @@ void MainComponent::showRandomMenu()
         auto& self = *safe;
         const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
 
-        // Instrumentos posibles: los integrados y las muestras que se pudieron cargar.
+        // Possible instruments: the built-ins and the samples that loaded.
         std::vector<model::InstrumentId> available;
         for (int id = model::instruments::first; id <= model::instruments::count; ++id)
             available.push_back (static_cast<model::InstrumentId> (id));
@@ -658,7 +658,7 @@ void MainComponent::showRandomMenu()
             case algorithm:   self.applyEdit ([seed] (model::Track& t) { model::randomizeAlgorithm (t, seed); }); break;
             case everything:  self.applyEdit ([seed, available] (model::Track& t) { model::randomizeEverything (t, seed, available); }); break;
             case everythingAllTracks:
-                // Un solo paso de deshacer para todas las pistas; cada una con su semilla.
+                // A single undo step for every track; each with its own seed.
                 self.applyProjectEdit ([seed, available] (model::Project& p)
                 {
                     for (std::size_t i = 0; i < p.tracks.size(); ++i)
@@ -668,25 +668,25 @@ void MainComponent::showRandomMenu()
             default: break;
         }
 
-        // Una forma nueva se encuadra en la parte del lienzo que no tapan los paneles.
+        // A new shape is framed in the part of the canvas the panels do not cover.
         if (newShape)
             self.graphView.zoomToFit (self.freeCanvasArea());
     });
 }
 
 // ---------------------------------------------------------------------------
-// Exportar
+// Export
 // ---------------------------------------------------------------------------
 
 namespace
 {
-    // Render del WAV en segundo plano, con barra de progreso y botón de cancelar.
+    // WAV render in the background, with a progress bar and a cancel button.
     class WavExportJob : public juce::ThreadWithProgressWindow
     {
     public:
         WavExportJob (model::Project projectToRender, std::vector<audio::SampleData> samplesToUse,
                       double beats, juce::File target)
-            : juce::ThreadWithProgressWindow (juce::String::fromUTF8 ("Exportando audio…"), true, true),
+            : juce::ThreadWithProgressWindow (juce::String::fromUTF8 ("Exporting audio…"), true, true),
               project (std::move (projectToRender)), samples (std::move (samplesToUse)),
               lengthBeats (beats), file (std::move (target)) {}
 
@@ -699,16 +699,16 @@ namespace
             });
         }
 
-        // En el hilo de la interfaz, al terminar o cancelar.
+        // On the UI thread, when finished or cancelled.
         void threadComplete (bool userPressedCancel) override
         {
             if (! userPressedCancel)
                 juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                                   .withIconType (juce::MessageBoxIconType::NoIcon)
-                                                  .withTitle (result.wasOk() ? juce::String::fromUTF8 ("Audio exportado")
-                                                                             : juce::String::fromUTF8 ("No se pudo exportar"))
+                                                  .withTitle (result.wasOk() ? juce::String ("Audio exported")
+                                                                             : juce::String ("Export failed"))
                                                   .withMessage (result.wasOk() ? file.getFullPathName() : result.getErrorMessage())
-                                                  .withButton ("Aceptar"),
+                                                  .withButton ("OK"),
                                               nullptr);
             delete this;
         }
@@ -739,8 +739,8 @@ model::Project MainComponent::projectForExport() const
 void MainComponent::showExportMenu()
 {
     juce::PopupMenu menu;
-    menu.addItem (1, text ("Exportar audio (WAV)…"));
-    menu.addItem (2, text ("Exportar MIDI…"));
+    menu.addItem (1, text ("Export audio (WAV)…"));
+    menu.addItem (2, text ("Export MIDI…"));
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exportButton),
                         [safe = juce::Component::SafePointer<MainComponent> (this)] (int result)
@@ -760,38 +760,38 @@ void MainComponent::exportProject (ExportKind kind)
     {
         juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                           .withIconType (juce::MessageBoxIconType::NoIcon)
-                                          .withTitle (text ("Nada que exportar"))
-                                          .withMessage (text ("Ninguna pista suena: revisa que tengan inicio y fin, y que no estén silenciadas."))
-                                          .withButton ("Aceptar"),
+                                          .withTitle ("Nothing to export")
+                                          .withMessage ("No track is playing: check that they have a start and an end, and that they are not muted.")
+                                          .withButton ("OK"),
                                       nullptr);
         return;
     }
 
-    // Duraciones posibles, con lo que dura cada una a este BPM.
+    // Possible lengths, with how long each one lasts at this BPM.
     struct Choice { juce::String label; double beats; };
     std::vector<Choice> choices;
     const auto full = engine::exportLengthBeats (p, 0, maxBeats);
-    choices.push_back ({ text ("Vuelta completa: hasta que todas las pistas coinciden"), full });
+    choices.push_back ({ "Full loop: until every track lines up again", full });
     for (const auto cycles : { 1, 2, 4, 8 })
-        choices.push_back ({ cycles == 1 ? text ("1 vuelta de la pista más larga")
-                                         : juce::String (cycles) + text (" vueltas de la pista más larga"),
+        choices.push_back ({ cycles == 1 ? juce::String ("1 loop of the longest track")
+                                         : juce::String (cycles) + " loops of the longest track",
                              engine::exportLengthBeats (p, cycles, maxBeats) });
 
     juce::StringArray labels;
     for (const auto& c : choices)
         labels.add (c.label + "  (" + formatSeconds (secondsFor (c.beats)) + ")");
 
-    auto* dialog = new juce::AlertWindow (kind == ExportKind::Wav ? text ("Exportar audio (WAV)") : text ("Exportar MIDI"),
+    auto* dialog = new juce::AlertWindow (kind == ExportKind::Wav ? "Export audio (WAV)" : "Export MIDI",
                                           kind == ExportKind::Wav
-                                              ? text ("Suenan las pistas no silenciadas, con sus instrumentos y muestras, a ") + juce::String (p.bpm, 0) + " BPM."
-                                              : text ("Una pista MIDI por cada pista que suena, con su nombre, a ") + juce::String (p.bpm, 0) + " BPM.",
+                                              ? "Unmuted tracks play, with their instruments and samples, at " + juce::String (p.bpm, 0) + " BPM."
+                                              : "One MIDI track per playing track, with its name, at " + juce::String (p.bpm, 0) + " BPM.",
                                           juce::MessageBoxIconType::NoIcon, this);
-    dialog->addComboBox ("length", labels, text ("Duración"));
+    dialog->addComboBox ("length", labels, "Length");
     auto choice = std::make_shared<int> (0);
     if (auto* box = dialog->getComboBoxComponent ("length"))
         box->onChange = [box, choice] { *choice = box->getSelectedItemIndex(); };
-    dialog->addButton (text ("Elegir archivo…"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-    dialog->addButton ("Cancelar", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    dialog->addButton (text ("Choose file…"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    dialog->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     dialog->enterModalState (true, juce::ModalCallbackFunction::create (
         [safe = juce::Component::SafePointer<MainComponent> (this), kind, choices, choice, p] (int result)
@@ -803,7 +803,7 @@ void MainComponent::exportProject (ExportKind kind)
         const auto extension = kind == ExportKind::Wav ? juce::String (".wav") : juce::String (".mid");
         const auto name = safe->projectDisplayName() + extension;
 
-        safe->fileChooser = std::make_unique<juce::FileChooser> (kind == ExportKind::Wav ? text ("Exportar audio") : text ("Exportar MIDI"),
+        safe->fileChooser = std::make_unique<juce::FileChooser> (kind == ExportKind::Wav ? "Export audio" : "Export MIDI",
                                                                  safe->defaultFolder().getChildFile (name), "*" + extension);
 
         safe->fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
@@ -827,17 +827,17 @@ void MainComponent::exportProject (ExportKind kind)
             const auto ok = file.replaceWithData (bytes.data(), bytes.size());
             juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                               .withIconType (juce::MessageBoxIconType::NoIcon)
-                                              .withTitle (ok ? text ("MIDI exportado") : text ("No se pudo exportar"))
+                                              .withTitle (ok ? "MIDI exported" : "Export failed")
                                               .withMessage (ok ? file.getFullPathName()
-                                                               : text ("No se pudo escribir ") + file.getFullPathName())
-                                              .withButton ("Aceptar"),
+                                                               : "Could not write " + file.getFullPathName())
+                                              .withButton ("OK"),
                                           nullptr);
         });
     }), true);
 }
 
 // ---------------------------------------------------------------------------
-// Muestras de sonido
+// Sound samples
 // ---------------------------------------------------------------------------
 
 std::shared_ptr<const juce::AudioBuffer<float>> MainComponent::decodeSample (const juce::File& file, double& sampleRate,
@@ -848,17 +848,17 @@ std::shared_ptr<const juce::AudioBuffer<float>> MainComponent::decodeSample (con
     std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (file));
     if (reader == nullptr)
     {
-        error = file.existsAsFile() ? text ("Formato no reconocido (usa WAV, AIFF, FLAC u OGG).")
-                                    : text ("El archivo no existe.");
+        error = file.existsAsFile() ? "Unrecognised format (use WAV, AIFF, FLAC or OGG)."
+                                    : "The file does not exist.";
         return nullptr;
     }
 
-    // Hasta 30 segundos, en estéreo (una muestra mono se copia a los dos canales).
+    // Up to 30 seconds, in stereo (a mono sample is copied to both channels).
     const auto length = static_cast<int> (std::min<juce::int64> (reader->lengthInSamples,
                                                                  static_cast<juce::int64> (maxSeconds * reader->sampleRate)));
     if (length < 2)
     {
-        error = text ("El archivo está vacío.");
+        error = "The file is empty.";
         return nullptr;
     }
 
@@ -915,9 +915,9 @@ void MainComponent::syncSamples()
     sampleData = data;
     syncedSamples = project.samples;
 
-    // Si falta alguna, se avisa; esa muestra queda en silencio hasta que vuelva.
+    // If any is missing, warn; that sample stays silent until it is back.
     sampleWarning = missing.isEmpty() ? juce::String()
-                  : (missing.size() == 1 ? text ("No se encontró la muestra ") : text ("No se encontraron las muestras "))
+                  : (missing.size() == 1 ? "Sample not found: " : "Samples not found: ")
                         + missing.joinIntoString (", ");
 }
 
@@ -926,7 +926,7 @@ void MainComponent::loadSample (bool forNode)
     const auto node = graphView.getSelectedNode();
     const auto trackIndex = active;
 
-    fileChooser = std::make_unique<juce::FileChooser> (text ("Cargar muestra de sonido"), defaultFolder(),
+    fileChooser = std::make_unique<juce::FileChooser> ("Load sound sample", defaultFolder(),
                                                        formatManager.getWildcardForAllFormats());
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -943,9 +943,9 @@ void MainComponent::loadSample (bool forNode)
         {
             juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                               .withIconType (juce::MessageBoxIconType::NoIcon)
-                                              .withTitle (text ("No se pudo cargar ") + file.getFileName())
+                                              .withTitle ("Could not load " + file.getFileName())
                                               .withMessage (error)
-                                              .withButton ("Aceptar"),
+                                              .withButton ("OK"),
                                           nullptr);
             return;
         }
@@ -955,8 +955,8 @@ void MainComponent::loadSample (bool forNode)
 
         applyProjectEdit ([&] (model::Project& p)
         {
-            // La misma muestra ya cargada se reutiliza; si no hay sitio, se quitan las
-            // que ninguna pista ni nodo usa.
+            // A sample already loaded is reused; if there is no room, the ones no
+            // track or node uses are removed.
             model::InstrumentId id = 0;
             for (const auto& s : p.samples)
                 if (s.path == path)
@@ -981,7 +981,7 @@ void MainComponent::loadSample (bool forNode)
             {
                 id = model::freeSampleId (p);
                 if (id == 0)
-                    return;   // diez muestras en uso: el desplegable ya lo avisa
+                    return;   // ten samples in use: the drop-down already says so
 
                 model::Sample s;
                 s.id = id;
@@ -1009,7 +1009,7 @@ void MainComponent::loadSample (bool forNode)
 }
 
 // ---------------------------------------------------------------------------
-// Archivos
+// Files
 // ---------------------------------------------------------------------------
 
 bool MainComponent::hasUnsavedChanges() const
@@ -1026,7 +1026,7 @@ void MainComponent::markSaved()
 
 void MainComponent::updateTitle()
 {
-    // "Lyra Nova • — Chimedes": el punto marca cambios sin guardar.
+    // "Lyra Nova • — Chimedes": the dot marks unsaved changes.
     const auto name = projectDisplayName();
     const auto title = name + (hasUnsavedChanges() ? juce::String::fromUTF8 (" \xe2\x80\xa2") : juce::String())
                      + juce::String::fromUTF8 (" \xe2\x80\x94 Chimedes");
@@ -1035,7 +1035,7 @@ void MainComponent::updateTitle()
         if (window->getName() != title)
             window->setName (title);
 
-    // El mismo nombre en la barra superior; si cambia de largo, la barra se ajusta.
+    // The same name in the top bar; if its length changes, the bar adjusts.
     const auto label = projectDisplayName() + (hasUnsavedChanges() ? juce::String::fromUTF8 ("  \xe2\x80\xa2") : juce::String());
     if (projectLabel.getText() != label)
     {
@@ -1047,7 +1047,7 @@ void MainComponent::updateTitle()
 
 juce::String MainComponent::projectDisplayName() const
 {
-    return currentFile == juce::File() ? text ("Sin título") : currentFile.getFileNameWithoutExtension();
+    return currentFile == juce::File() ? juce::String ("Untitled") : currentFile.getFileNameWithoutExtension();
 }
 
 juce::Rectangle<int> MainComponent::freeCanvasArea() const
@@ -1078,19 +1078,19 @@ void MainComponent::confirmDiscardChanges (std::function<void()> proceed)
         return;
     }
 
-    const auto name = currentFile == juce::File() ? text ("el proyecto sin título")
+    const auto name = currentFile == juce::File() ? juce::String ("the untitled project")
                                                   : "\"" + currentFile.getFileName() + "\"";
 
     const auto options = juce::MessageBoxOptions()
                              .withIconType (juce::MessageBoxIconType::NoIcon)
-                             .withTitle (text ("¿Guardar los cambios?"))
-                             .withMessage (text ("Hay cambios sin guardar en ") + name + text (". Si no los guardas, se perderán."))
-                             .withButton ("Guardar")
-                             .withButton ("No guardar")
-                             .withButton ("Cancelar")
+                             .withTitle ("Save changes?")
+                             .withMessage ("There are unsaved changes in " + name + ". If you don't save them, they will be lost.")
+                             .withButton ("Save")
+                             .withButton ("Don't save")
+                             .withButton ("Cancel")
                              .withAssociatedComponent (this);
 
-    // Con tres botones, JUCE devuelve 1, 2 y 0 (el tercero también con Esc).
+    // With three buttons, JUCE returns 1, 2 and 0 (the third also with Esc).
     juce::AlertWindow::showAsync (options, [safeThis = juce::Component::SafePointer<MainComponent> (this),
                                             proceed = std::move (proceed)] (int result)
     {
@@ -1108,13 +1108,13 @@ void MainComponent::newProject()
 {
     confirmDiscardChanges ([this]
     {
-        // Documento nuevo: una sola pista vacía, con las opciones de la pista activa.
+        // New document: a single empty track, with the active track's options.
         engine.stop();
         graphView.selectNode (model::noNode);
 
         auto empty = activeTrack();
         empty.id = 1;
-        empty.name = "Pista 1";
+        empty.name = "Track 1";
         empty.nodes.clear();
         empty.edges.clear();
         empty.startNode = model::noNode;
@@ -1135,7 +1135,7 @@ void MainComponent::openProject()
 {
     confirmDiscardChanges ([this]
     {
-        fileChooser = std::make_unique<juce::FileChooser> (text ("Abrir proyecto"), defaultFolder(),
+        fileChooser = std::make_unique<juce::FileChooser> ("Open project", defaultFolder(),
                                                            juce::String ("*") + model::projectFileExtension);
 
         fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -1154,15 +1154,15 @@ void MainComponent::openFile (const juce::File& file)
     {
         juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                           .withIconType (juce::MessageBoxIconType::NoIcon)
-                                          .withTitle (text ("No se pudo abrir ") + file.getFileName())
+                                          .withTitle ("Could not open " + file.getFileName())
                                           .withMessage (message)
-                                          .withButton ("Aceptar"),
+                                          .withButton ("OK"),
                                       nullptr);
     };
 
     if (! file.existsAsFile())
     {
-        showError (text ("El archivo no existe."));
+        showError ("The file does not exist.");
         return;
     }
 
@@ -1177,7 +1177,7 @@ void MainComponent::openFile (const juce::File& file)
     graphView.selectNode (model::noNode);
     undoManager.clearUndoHistory();
 
-    // Rutas de muestras relativas a la carpeta del proyecto → absolutas.
+    // Sample paths relative to the project folder → absolute.
     auto opened = loaded.project;
     for (auto& s : opened.samples)
     {
@@ -1211,9 +1211,9 @@ void MainComponent::saveProjectAs (std::function<void (bool)> done)
 {
     const auto suggested = currentFile != juce::File()
                                ? currentFile
-                               : defaultFolder().getChildFile (text ("Sin título") + model::projectFileExtension);
+                               : defaultFolder().getChildFile ("Untitled" + juce::String (model::projectFileExtension));
 
-    fileChooser = std::make_unique<juce::FileChooser> (text ("Guardar proyecto"), suggested,
+    fileChooser = std::make_unique<juce::FileChooser> ("Save project", suggested,
                                                        juce::String ("*") + model::projectFileExtension);
 
     fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
@@ -1224,7 +1224,7 @@ void MainComponent::saveProjectAs (std::function<void (bool)> done)
         if (file == juce::File())
         {
             if (done)
-                done (false);   // cancelado
+                done (false);   // cancelled
             return;
         }
 
@@ -1246,8 +1246,8 @@ bool MainComponent::writeFile (const juce::File& file)
     auto toSave = project;
     toSave.bpm = engine.getBpm();
 
-    // Las muestras dentro de la carpeta del proyecto se guardan con ruta relativa:
-    // así se puede mover o compartir la carpeta entera.
+    // Samples inside the project folder are saved with a relative path:
+    // so the whole folder can be moved or shared.
     const auto folder = file.getParentDirectory();
     for (auto& s : toSave.samples)
     {
@@ -1256,8 +1256,8 @@ bool MainComponent::writeFile (const juce::File& file)
             s.path = sampleFile.getRelativePathFrom (folder).replaceCharacter ('\\', '/').toStdString();
     }
 
-    // Se escribe en un temporal y luego se reemplaza: si algo falla, el archivo
-    // anterior queda intacto.
+    // It is written to a temporary file and then replaced: if anything fails, the
+    // previous file stays intact.
     juce::TemporaryFile temp (file);
     const auto json = juce::String::fromUTF8 (model::projectToJson (toSave).c_str());
     const auto ok = temp.getFile().replaceWithText (json, false, false, "\n") && temp.overwriteTargetFileWithTemporary();
@@ -1266,10 +1266,10 @@ bool MainComponent::writeFile (const juce::File& file)
     {
         juce::AlertWindow::showAsync (juce::MessageBoxOptions()
                                           .withIconType (juce::MessageBoxIconType::NoIcon)
-                                          .withTitle (text ("No se pudo guardar"))
-                                          .withMessage (text ("No se pudo escribir ") + file.getFullPathName()
-                                                        + text (". Revisa que la carpeta exista y que tengas permiso."))
-                                          .withButton ("Aceptar"),
+                                          .withTitle ("Could not save")
+                                          .withMessage ("Could not write " + file.getFullPathName()
+                                                        + ". Check that the folder exists and that you have permission.")
+                                          .withButton ("OK"),
                                       nullptr);
         return false;
     }

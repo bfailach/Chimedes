@@ -6,15 +6,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# El código fuente está en UTF-8 (textos con acentos). Visual Studio necesita saberlo.
+# Source code is UTF-8 (text with accents). Visual Studio needs to know.
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
-option(CHIMEDES_BUILD_APP   "Compilar la aplicación de escritorio (requiere JUCE)" ON)
-option(CHIMEDES_BUILD_TESTS "Compilar las pruebas del motor" ON)
+option(CHIMEDES_BUILD_APP   "Build the desktop application (requires JUCE)" ON)
+option(CHIMEDES_BUILD_TESTS "Build the engine tests" ON)
 
 # ---------------------------------------------------------------------------
-# Núcleo: modelo y motor en C++ puro, sin dependencias de JUCE.
-# Se compila aparte para poder probarlo sin interfaz ni audio.
+# Core: model and engine in plain C++, with no JUCE dependency.
+# Built separately so it can be tested without UI or audio.
 # ---------------------------------------------------------------------------
 add_library(chimedes_core STATIC
     Source/model/Track.cpp
@@ -38,7 +38,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Pruebas del motor
+# Engine tests
 # ---------------------------------------------------------------------------
 if(CHIMEDES_BUILD_TESTS)
     enable_testing()
@@ -59,7 +59,7 @@ if(CHIMEDES_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
-# Aplicación de escritorio
+# Desktop application
 # ---------------------------------------------------------------------------
 if(CHIMEDES_BUILD_APP)
     add_subdirectory(JUCE)
@@ -84,7 +84,7 @@ if(CHIMEDES_BUILD_APP)
         Source/ui/WindowStyle.cpp
     )
 
-    # Tipografías del tema (Space Grotesk y JetBrains Mono, licencia SIL OFL).
+    # Theme fonts (Space Grotesk and JetBrains Mono, SIL OFL license).
     juce_add_binary_data(ChimedesFonts
         HEADER_NAME BinaryData.h
         NAMESPACE BinaryData
@@ -112,13 +112,13 @@ if(CHIMEDES_BUILD_APP)
             juce::juce_recommended_warning_flags
     )
 
-    # Barra de título oscura en Windows (DwmSetWindowAttribute).
+    # Dark title bar on Windows (DwmSetWindowAttribute).
     if(WIN32)
         target_link_libraries(Chimedes PRIVATE dwmapi)
     endif()
 
-    # Herramienta de desarrollo: renderiza el grafo de demostración a WAV sin tarjeta
-    # de sonido, con el mismo motor de audio que la aplicación.
+    # Development tool: renders the demo graph to WAV without a sound
+    # card, using the same audio engine as the application.
     juce_add_console_app(ChimedesRender PRODUCT_NAME "ChimedesRender")
 
     target_sources(ChimedesRender PRIVATE

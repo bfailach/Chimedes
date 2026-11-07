@@ -5,13 +5,13 @@
 namespace chimedes::model
 {
 
-// Grafo de demostración mientras no existe el editor: una pequeña frase en do mayor
-// con dos ramas que se reúnen en un acorde final. Dirigido, inicio en 1, fin en 8.
+// Demo graph shown at startup: a short phrase in C major with two branches
+// that meet in a final chord. Directed, start at 1, end at 8.
 inline Track makeDemoTrack()
 {
     Track t;
     t.id = 1;
-    t.name = "Demostración";
+    t.name = "Demo";
     t.directed = true;
 
     const auto add = [&t] (NodeId id, double x, double y, std::vector<int> pitches, double duration)
@@ -25,14 +25,14 @@ inline Track makeDemoTrack()
         t.nodes.push_back (std::move (n));
     };
 
-    add (1,   0, 260, { 60 },         1.0);  // do
-    add (2, 100, 160, { 64 },         1.0);  // mi
-    add (3, 150, 380, { 67 },         1.0);  // sol
-    add (4, 250, 120, { 69 },         1.0);  // la
-    add (5, 300, 280, { 60, 64, 67 }, 2.0);  // do mayor
-    add (6, 400, 420, { 74 },         1.0);  // re
-    add (7, 450, 180, { 76 },         1.0);  // mi agudo
-    add (8, 600, 280, { 57, 60, 64 }, 2.0);  // la menor
+    add (1,   0, 260, { 60 },         1.0);  // C
+    add (2, 100, 160, { 64 },         1.0);  // E
+    add (3, 150, 380, { 67 },         1.0);  // G
+    add (4, 250, 120, { 69 },         1.0);  // A
+    add (5, 300, 280, { 60, 64, 67 }, 2.0);  // C major
+    add (6, 400, 420, { 74 },         1.0);  // D
+    add (7, 450, 180, { 76 },         1.0);  // high E
+    add (8, 600, 280, { 57, 60, 64 }, 2.0);  // A minor
 
     EdgeId nextEdge = 1;
     for (const auto& [from, to] : std::vector<std::pair<NodeId, NodeId>> {

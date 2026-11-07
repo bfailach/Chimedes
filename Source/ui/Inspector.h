@@ -13,9 +13,9 @@
 namespace chimedes::ui
 {
 
-// Panel derecho: propiedades de la pista y del nodo seleccionado.
-// No guarda estado propio: refresh() lo vuelve a leer de la pista, y cada cambio
-// se pide por EditCallbacks para que se pueda deshacer.
+// Right panel: properties of the track and of the selected node.
+// It keeps no state of its own: refresh() reads it again from the track, and
+// every change goes through EditCallbacks so it can be undone.
 class Inspector : public juce::Component
 {
 public:
@@ -23,24 +23,24 @@ public:
 
     EditCallbacks callbacks;
 
-    // Vuelve a mostrar la pista y el nodo seleccionado (noNode = ninguno).
+    // Shows the track and the selected node again (noNode = none).
     void refresh (const model::Track& track, model::NodeId selectedNode);
 
-    // Alto que necesita para mostrar todo su contenido.
+    // Height it needs to show all of its content.
     int getIdealHeight() const;
 
-    // Notas de prueba del teclado: velocidad 0 = apagar. El instrumento ya viene
-    // resuelto (el del nodo o el de la pista).
+    // Keyboard preview notes: velocity 0 = off. The instrument is already
+    // resolved (the node's or the track's).
     std::function<void (int pitch, int velocity, int instrument)> onAudition;
 
-    // Muestras del proyecto para los desplegables de instrumento (id y nombre).
-    // `canLoadMore` habilita "Cargar muestra…" (hay como mucho diez).
+    // The project's samples for the instrument drop-downs (id and name).
+    // `canLoadMore` enables "Load sample…" (there are ten at most).
     void setSampleChoices (std::vector<std::pair<model::InstrumentId, juce::String>> samples, bool canLoadMore);
 
-    // "Cargar muestra…" en el desplegable de la pista (false) o del nodo (true).
+    // "Load sample…" in the track's drop-down (false) or the node's (true).
     std::function<void (bool forNode)> onLoadSample;
 
-    // Teclado de la computadora para el piano (solo con un nodo seleccionado).
+    // Computer keyboard for the piano (only with a node selected).
     bool handlePianoKeyPress (const juce::KeyPress& key);
     bool handlePianoKeyStateChange();
     void releasePianoKeys() { piano.releaseAllKeys(); }
@@ -49,7 +49,7 @@ public:
     void resized() override;
 
 private:
-    int layout (bool apply);  // coloca los controles (si apply) y devuelve el alto total
+    int layout (bool apply);  // places the controls (if apply) and returns the total height
     void editNode (const std::function<void (model::Node&)>& change);
     void updateNotesDisplay();
     void rebuildInstrumentBoxes();
@@ -61,15 +61,15 @@ private:
 
     std::vector<std::pair<model::InstrumentId, juce::String>> sampleChoices;
     bool canLoadSample = true;
-    int trackInstrumentItem = 1;   // lo elegido, para volver a ello tras "Cargar muestra…"
+    int trackInstrumentItem = 1;   // the chosen one, to go back to it after "Load sample…"
     int nodeInstrumentItem = 1;
 
-    // Pista
+    // Track
     juce::Label trackHeader;
     juce::ComboBox modeBox, treeBox, traversalBox, siblingsBox, quantizeBox, trackInstrumentBox;
     juce::ToggleButton directedToggle;
 
-    // Nodo
+    // Node
     juce::Label nodeHeader, notesLabel, notesValue, notesHint, instrumentLabel, durationLabel, velocityLabel;
     PianoPicker piano;
     juce::ComboBox nodeInstrumentBox;

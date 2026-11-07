@@ -1,9 +1,9 @@
 #pragma once
 
-// Marco de pruebas mínimo, sin dependencias, para que el núcleo se pruebe
-// sin compilar JUCE. Uso:
+// Minimal, dependency-free test framework, so the core can be tested
+// without building JUCE. Usage:
 //
-//   TEST ("nombre de la prueba") { CHECK (a == b); CHECK_NEAR (x, 1.5); }
+//   TEST ("test name") { CHECK (a == b); CHECK_NEAR (x, 1.5); }
 
 #include <cmath>
 #include <functional>
@@ -43,7 +43,7 @@ struct Registrar
 inline void reportFailure (const char* file, int line, const std::string& message)
 {
     ++failureCount();
-    std::cerr << "    FALLO " << file << ":" << line << "  " << message << "\n";
+    std::cerr << "    FAILED " << file << ":" << line << "  " << message << "\n";
 }
 
 } // namespace chimedes::test
@@ -70,10 +70,10 @@ inline void reportFailure (const char* file, int line, const std::string& messag
         if (std::abs (chimedesActual - chimedesExpected) > 1e-9)                           \
             chimedes::test::reportFailure (__FILE__, __LINE__,                             \
                 std::string (#actual) + " = " + std::to_string (chimedesActual)            \
-                + ", se esperaba " + std::to_string (chimedesExpected));                   \
+                + ", expected " + std::to_string (chimedesExpected));                      \
     } while (false)
 
-// Detiene la prueba actual si la condición falla (para no seguir con datos inválidos).
+// Stops the current test if the condition fails (so it does not go on with invalid data).
 #define REQUIRE(condition)                                                                 \
     do {                                                                                   \
         if (! (condition)) {                                                               \

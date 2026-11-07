@@ -9,7 +9,7 @@ namespace chimedes::audio
 
 namespace
 {
-    // Receptor que descarta mensajes (al apagar notas, el sintetizador ya se encarga).
+    // Sink that drops messages (when turning notes off, the synth already handles it).
     constexpr auto ignoreMessages = [] (double, int, int, int, bool) {};
 }
 
@@ -19,7 +19,7 @@ AudioEngine::AudioEngine()
     {
         slot = std::make_unique<TrackSlot>();
 
-        // Un sonido por instrumento, cada uno en su canal MIDI.
+        // One sound per instrument, each on its own MIDI channel.
         for (int id = model::instruments::first; id <= model::instruments::count; ++id)
             slot->synth.addSound (new InstrumentSound (id));
 
@@ -43,7 +43,7 @@ AudioEngine::AudioEngine()
 AudioEngine::~AudioEngine() = default;
 
 // ---------------------------------------------------------------------------
-// Hilo de audio
+// Audio thread
 // ---------------------------------------------------------------------------
 
 void AudioEngine::prepareToPlay (int, double newSampleRate)
@@ -53,7 +53,7 @@ void AudioEngine::prepareToPlay (int, double newSampleRate)
     for (auto& slot : slots)
     {
         slot->synth.setCurrentPlaybackSampleRate (newSampleRate);
-        slot->midi.ensureSize (8192);  // para no asignar dentro del ciclo de audio
+        slot->midi.ensureSize (8192);  // so nothing is allocated inside the audio callback
     }
 
     previewSynth.setCurrentPlaybackSampleRate (newSampleRate);
@@ -85,11 +85,11 @@ void AudioEngine::getNextAudioBlock (const juce::AudioSourceChannelInfo& block)
         for (auto& slot : slots)
         {
             slot->sequencer.allNotesOff (position, ignoreMessages);
-            slot->synth.allNotesOff (0, true);  // con cola de release
+            slot->synth.allNotesOff (0, true);  // with release tail
         }
     }
 
-    // Toma el horario más reciente de cada pista y anuncia cuál está usando.
+    // Takes each track's latest schedule and announces which one it is using.
     for (auto& slot : slots)
     {
         const auto* schedule = slot->pending.load (std::memory_order_acquire);
@@ -108,7 +108,7 @@ void AudioEngine::getNextAudioBlock (const juce::AudioSourceChannelInfo& block)
         }
         else
         {
-            slot->midi.clear();  // sin notas nuevas, pero las colas de release siguen sonando
+            slot->midi.clear();  // no new notes, but release tails keep sounding
             slot->synth.renderNextBlock (*block.buffer, slot->midi, block.startSample, block.numSamples);
         }
     }
@@ -158,7 +158,7 @@ void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer
     slot.sequencer.process (fromBeat, toBeat, [&] (double beat, int pitch, int velocity, int instrument, bool isNoteOn)
     {
         const auto offset = std::clamp (static_cast<int> ((beat - fromBeat) / beatsPerSample), 0, numSamples - 1);
-        const auto channel = std::clamp (instrument, 1, 16);  // el canal MIDI elige el instrumento
+        const auto channel = std::clamp (instrument, 1, 16);  // the MIDI channel picks the instrument
 
         const auto message = isNoteOn
             ? juce::MidiMessage::noteOn (channel, pitch, static_cast<juce::uint8> (std::clamp (velocity, 1, 127)))
@@ -171,7 +171,7 @@ void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer
 }
 
 // ---------------------------------------------------------------------------
-// Hilo de la interfaz
+// UI thread
 // ---------------------------------------------------------------------------
 
 void AudioEngine::publishSchedule (int slot, std::shared_ptr<const engine::Schedule> schedule)
@@ -213,15 +213,15 @@ void AudioEngine::setSamples (const std::vector<SampleData>& samples)
 
 void AudioEngine::collectGarbage()
 {
-    // Muestras quitadas hace un par de segundos: ninguna voz las puede estar usando.
+    // Samples removed a couple of seconds ago: no voice can be using them.
     for (auto& r : retiredSamples)
         ++r.ticks;
     retiredSamples.erase (std::remove_if (retiredSamples.begin(), retiredSamples.end(),
                                           [] (const RetiredSamples& r) { return r.ticks > 8; }),
                           retiredSamples.end());
 
-    // Un horario retirado se libera tras dos llamadas (cientos de milisegundos, mucho
-    // más que un bloque de audio) y solo si el audio no lo está usando.
+    // A retired schedule is freed after two calls (hundreds of milliseconds, much
+    // longer than an audio block) and only if audio is not using it.
     for (auto& p : published)
         if (p.retiredTicks >= 0)
             ++p.retiredTicks;

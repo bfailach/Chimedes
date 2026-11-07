@@ -20,18 +20,18 @@ namespace
     constexpr float maxZoom = 4.0f;
     constexpr float edgeHitDistance = 6.0f;
 
-    // Fracción interior del radio que mueve el nodo; el anillo exterior conecta.
+    // Inner fraction of the radius that moves the node; the outer ring connects.
     constexpr float moveAreaFraction = 0.55f;
 
     enum MenuItem { setStart = 1, setEnd, deleteNode };
 
-    // Tiempos de la animación, en milisegundos.
-    constexpr double flashMs = 1600.0;      // del color intenso al pastel del rastro
-    constexpr double swellMs = 400.0;       // la estrella se hincha al sonar
-    constexpr double rippleMs = 1000.0;     // cada onda
-    constexpr double rippleDelayMs = 140.0; // separación entre ondas
-    constexpr double trailFadeMs = 900.0;   // el rastro del ciclo anterior se apaga
-    constexpr double maxSparkBeats = 1.0;   // la chispa recorre la arista en ≤ 1 pulso
+    // Animation timings, in milliseconds.
+    constexpr double flashMs = 1600.0;      // from the vivid colour to the trail's pastel
+    constexpr double swellMs = 400.0;       // the star swells when it sounds
+    constexpr double rippleMs = 1000.0;     // each ripple
+    constexpr double rippleDelayMs = 140.0; // gap between ripples
+    constexpr double trailFadeMs = 900.0;   // the previous cycle's trail fades out
+    constexpr double maxSparkBeats = 1.0;   // the spark crosses the edge in ≤ 1 beat
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -47,13 +47,13 @@ namespace
         return pitches.empty() ? theme::accent : theme::pitchTrail (pitches.front());
     }
 
-    // Color mientras destella: del tono intenso al pastel.
+    // Colour while flashing: from the vivid hue to the pastel.
     juce::Colour flashColour (const std::vector<int>& pitches, double ageMs)
     {
         return mainColour (pitches).interpolatedWith (trailColour (pitches), clamp01 (ageMs / flashMs));
     }
 
-    // Generador determinista para el fondo de estrellas: cada celda siempre igual.
+    // Deterministic generator for the star background: each cell always the same.
     juce::uint32 hashCell (int x, int y)
     {
         auto h = static_cast<juce::uint32> (x) * 73856093u ^ static_cast<juce::uint32> (y) * 19349663u;
@@ -65,16 +65,16 @@ namespace
 GraphView::GraphView()
 {
     setOpaque (true);
-    setWantsKeyboardFocus (true);  // las teclas que no maneja suben a la ventana
+    setWantsKeyboardFocus (true);  // keys it does not handle go up to the window
 }
 
 // ---------------------------------------------------------------------------
-// Datos
+// Data
 // ---------------------------------------------------------------------------
 
 void GraphView::setTracks (std::vector<TrackView> tracks, std::size_t activeIndex)
 {
-    // Conserva la animación de cada pista (por su id) aunque cambie su contenido.
+    // Keeps each track's animation (by id) even if its content changes.
     std::vector<Layer> next;
     next.reserve (tracks.size());
 
@@ -109,8 +109,8 @@ const GraphView::Layer* GraphView::activeLayer() const noexcept
 
 void GraphView::setPlayhead (double positionBeats, bool isPlaying, double bpm)
 {
-    // Al arrancar, la nota en la posición actual también debe destellar
-    // (el audio puede ir ya un poco adelante cuando llega la primera posición).
+    // On start, the note at the current position must flash too
+    // (audio may already be a little ahead when the first position arrives).
     if (isPlaying && ! playing)
         for (auto& layer : layers)
             if (layer.schedule != nullptr && layer.schedule->cycleLengthBeats > 0.0)
@@ -125,15 +125,15 @@ void GraphView::setPlayhead (double positionBeats, bool isPlaying, double bpm)
 }
 
 // ---------------------------------------------------------------------------
-// Animación
+// Animation
 // ---------------------------------------------------------------------------
 
 void GraphView::onFrame()
 {
     const auto now = nowMs();
 
-    // La posición llega a ~30 Hz desde el audio; entre medias se interpola con el
-    // tempo, sin adelantarse más de dos llamadas (si el audio se detiene, se para).
+    // The position arrives at ~30 Hz from audio; in between it is interpolated with
+    // the tempo, never more than two calls ahead (if audio stops, so does this).
     auto position = playheadBeat;
     if (playing)
         position += std::min (now - playheadMs, 70.0) / 60000.0 * currentBpm;
@@ -146,7 +146,7 @@ void GraphView::onFrame()
         {
             const auto target = std::fmod (position, cycle);
 
-            if (target + cycle * 0.5 < layer.animBeat)   // dio la vuelta: ciclo nuevo
+            if (target + cycle * 0.5 < layer.animBeat)   // wrapped around: new cycle
             {
                 detectOnsets (layer, layer.animBeat, cycle, now);
                 startNewCycle (layer, now);
@@ -161,7 +161,7 @@ void GraphView::onFrame()
         }
         else
         {
-            // Detenido (posición en 0 tras haber sonado): el rastro se apaga.
+            // Stopped (position at 0 after playing): the trail fades out.
             if (! playing && playheadBeat <= 0.0 && ! layer.onsets.empty())
                 startNewCycle (layer, now);
 
@@ -206,7 +206,7 @@ bool GraphView::isAnimating (double now) const noexcept
 
 model::NodeId GraphView::getSelectedNode() const noexcept
 {
-    // Tras deshacer, el nodo seleccionado puede haber dejado de existir.
+    // After an undo, the selected node may no longer exist.
     return track != nullptr && track->findNode (selectedNode) != nullptr ? selectedNode : model::noNode;
 }
 
@@ -247,7 +247,7 @@ void GraphView::zoomToFit (juce::Rectangle<int> visibleArea)
         minY = std::min (minY, n.y);  maxY = std::max (maxY, n.y);
     }
 
-    // Margen para los círculos y las etiquetas de inicio, fin y notas.
+    // Margin for the circles and the start, end and note labels.
     constexpr double margin = 70.0;
     const auto width = (maxX - minX) + 2.0 * margin;
     const auto height = (maxY - minY) + 2.0 * margin;
@@ -282,7 +282,7 @@ void GraphView::deleteSelection()
 }
 
 // ---------------------------------------------------------------------------
-// Coordenadas y búsqueda
+// Coordinates and lookup
 // ---------------------------------------------------------------------------
 
 juce::Point<float> GraphView::toScreen (double x, double y) const noexcept
@@ -304,7 +304,7 @@ juce::Point<double> GraphView::toModel (juce::Point<float> screen) const noexcep
 
 std::optional<std::size_t> GraphView::backgroundTrackAt (juce::Point<float> screen) const
 {
-    // Solo el centro de la estrella (no el anillo): así es difícil activarla sin querer.
+    // Only the star's centre (not the ring): so it is hard to activate by accident.
     for (std::size_t i = layers.size(); i-- > 0;)
         if (i != active && layers[i].track != nullptr)
             for (const auto& node : layers[i].track->nodes)
@@ -319,7 +319,7 @@ const model::Node* GraphView::nodeAt (juce::Point<float> screen) const noexcept
     if (track == nullptr)
         return nullptr;
 
-    // Al revés del orden de dibujo: el nodo de arriba gana.
+    // Reverse drawing order: the node on top wins.
     for (auto it = track->nodes.rbegin(); it != track->nodes.rend(); ++it)
         if (toScreen (*it).getDistanceFrom (screen) <= nodeRadius + 4.0f)
             return &*it;
@@ -354,7 +354,7 @@ model::EdgeId GraphView::edgeAt (juce::Point<float> screen) const noexcept
 }
 
 // ---------------------------------------------------------------------------
-// Ratón
+// Mouse
 // ---------------------------------------------------------------------------
 
 void GraphView::mouseMove (const juce::MouseEvent& e)
@@ -409,7 +409,7 @@ void GraphView::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        // Clic en una estrella de otra pista: esa pista pasa a ser la activa.
+        // Click on another track's star: that track becomes active.
         if (! e.mods.isMiddleButtonDown())
             if (const auto other = backgroundTrackAt (e.position); other.has_value() && onActivateTrack)
             {
@@ -454,7 +454,7 @@ void GraphView::mouseDrag (const juce::MouseEvent& e)
         case Drag::MovingNode:
         {
             const auto m = toModel (e.position);
-            // x >= 0: nada antes del pulso 0 de la regla.
+            // x >= 0: nothing before beat 0 of the ruler.
             const auto x = std::max (0.0, m.x + dragOffset.x);
             const auto y = m.y + dragOffset.y;
             const auto id = dragNode;
@@ -512,7 +512,7 @@ void GraphView::mouseDoubleClick (const juce::MouseEvent& e)
     const auto x = std::max (0.0, m.x);
     const auto y = m.y;
 
-    // El nuevo nodo copia las notas y la duración del último nodo seleccionado.
+    // The new node copies the notes and duration of the last selected node.
     const auto pitches = lastPitches;
     const auto duration = lastDuration;
 
@@ -523,7 +523,7 @@ void GraphView::mouseDoubleClick (const juce::MouseEvent& e)
 
 void GraphView::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
-    // Zoom alrededor del cursor: el punto bajo el ratón se queda quieto.
+    // Zoom around the cursor: the point under the mouse stays put.
     const auto anchor = toModel (e.position);
     const auto factor = std::pow (1.15f, wheel.deltaY * 4.0f);
     zoom = std::clamp (zoom * factor, minZoom, maxZoom);
@@ -536,10 +536,10 @@ void GraphView::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWhee
 void GraphView::showNodeMenu (model::NodeId node)
 {
     juce::PopupMenu menu;
-    menu.addItem (setStart, text ("Marcar como inicio"), true, track->startNode == node);
-    menu.addItem (setEnd, text ("Marcar como fin"), true, track->endNode == node);
+    menu.addItem (setStart, "Mark as start", true, track->startNode == node);
+    menu.addItem (setEnd, "Mark as end", true, track->endNode == node);
     menu.addSeparator();
-    menu.addItem (deleteNode, text ("Eliminar nodo"));
+    menu.addItem (deleteNode, "Delete node");
 
     menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
                         [safeThis = juce::Component::SafePointer<GraphView> (this), node] (int result)
@@ -558,12 +558,12 @@ void GraphView::showNodeMenu (model::NodeId node)
 }
 
 // ---------------------------------------------------------------------------
-// Dibujo
+// Drawing
 // ---------------------------------------------------------------------------
 
 float GraphView::starRadius (const model::Node& node) const noexcept
 {
-    // El tamaño sigue a la intensidad y crece un poco con el zoom.
+    // Size follows velocity and grows a little with zoom.
     const auto base = 4.5f + 5.5f * static_cast<float> (std::clamp (node.velocity, 1, 127)) / 127.0f;
     return base * juce::jlimit (0.75f, 1.4f, std::sqrt (zoom));
 }
@@ -582,7 +582,7 @@ void GraphView::paint (juce::Graphics& g)
     if (track == nullptr)
         return;
 
-    // Las otras pistas, atenuadas y debajo: se ven y se animan, pero no se editan.
+    // The other tracks, dimmed and underneath: visible and animated, but not editable.
     if (layers.size() > 1)
     {
         g.beginTransparencyLayer (0.38f);
@@ -617,7 +617,7 @@ void GraphView::paintSky (juce::Graphics& g) const
 {
     g.fillAll (colours::background);
 
-    // Fondo de estrellas tenues con paralaje: se mueve al 30 % del desplazamiento.
+    // Background of faint stars with parallax: it moves at 30 % of the scroll.
     constexpr float cell = 220.0f;
     constexpr float parallax = 0.3f;
     const auto offsetX = static_cast<float> (viewOrigin.x) * zoom * parallax;
@@ -648,7 +648,7 @@ void GraphView::paintSky (juce::Graphics& g) const
 
 void GraphView::paintAtlasGrid (juce::Graphics& g) const
 {
-    // Líneas curvas de un atlas celeste, ancladas al modelo: se mueven con el grafo.
+    // Curved lines of a celestial atlas, anchored to the model: they move with the graph.
     constexpr double spacing = 320.0;
     const auto topLeft = toModel ({ 0.0f, static_cast<float> (rulerHeight) });
     const auto bottomRight = toModel ({ static_cast<float> (getWidth()), static_cast<float> (getHeight()) });
@@ -679,7 +679,7 @@ void GraphView::paintAtlasGrid (juce::Graphics& g) const
 
 void GraphView::paintRuler (juce::Graphics& g) const
 {
-    // La regla y las líneas de pulso solo tienen sentido cuando X es el tiempo.
+    // The ruler and beat lines only make sense when X is time.
     if (track == nullptr || track->mode != model::PlaybackMode::Timeline)
         return;
 
@@ -687,7 +687,7 @@ void GraphView::paintRuler (juce::Graphics& g) const
 
     const auto beatWidth = static_cast<float> (model::pixelsPerBeat) * zoom;
 
-    // Con poco zoom, una etiqueta cada 2, 4 u 8 pulsos para que no se amontonen.
+    // When zoomed out, a label every 2, 4 or 8 beats so they do not crowd.
     int labelEvery = 1;
     while (beatWidth * static_cast<float> (labelEvery) < 36.0f)
         labelEvery *= 2;
@@ -707,7 +707,7 @@ void GraphView::paintRuler (juce::Graphics& g) const
 
         if (beat % labelEvery == 0)
         {
-            // El número queda centrado sobre su línea.
+            // The number is centred over its line.
             g.setColour (colours::textDisabled);
             g.drawText (juce::String (beat), juce::Rectangle<float> (40.0f, static_cast<float> (rulerHeight) - 8.0f).withCentre ({ x, (static_cast<float> (rulerHeight) - 6.0f) * 0.5f }),
                         juce::Justification::centred);
@@ -732,7 +732,7 @@ void GraphView::paintEdges (juce::Graphics& g, const Layer& layer, bool isActive
         if (length <= ra + rb)
             continue;
 
-        // La línea va de borde a borde de las estrellas, con un pequeño espacio.
+        // The line goes from star edge to star edge, with a small gap.
         const auto direction = (b - a) / length;
         const juce::Line<float> line (a + direction * ra, b - direction * rb);
 
@@ -749,7 +749,7 @@ void GraphView::paintEdges (juce::Graphics& g, const Layer& layer, bool isActive
 
 void GraphView::paintLitEdges (juce::Graphics& g, const Layer& layer, double now) const
 {
-    // Aristas ya recorridas: degradado del color de una nota al de la siguiente.
+    // Edges already travelled: a gradient from one note's colour to the next.
     auto paintSet = [&] (const std::unordered_map<model::NodeId, Onset>& set, float fade, bool skipRelit)
     {
         for (const auto& [id, onset] : set)
@@ -794,7 +794,7 @@ void GraphView::paintLitEdges (juce::Graphics& g, const Layer& layer, double now
 
 void GraphView::paintSparks (juce::Graphics& g, const Layer& layer) const
 {
-    // Chispa que viaja hacia la próxima nota, con una cola que recorre el espectro.
+    // Spark travelling towards the next note, with a tail that runs through the spectrum.
     if (! playing || layer.schedule == nullptr)
         return;
 
@@ -823,7 +823,7 @@ void GraphView::paintSparks (juce::Graphics& g, const Layer& layer) const
         const auto hueA = parent->pitches.empty() ? 0.0f : static_cast<float> (parent->pitches.front() % 12) / 12.0f;
         const auto hueB = e.pitches.empty() ? 0.0f : static_cast<float> (e.pitches.front() % 12) / 12.0f;
 
-        // Línea que se va trazando detrás de la chispa.
+        // Line being drawn behind the spark.
         const auto head = a + (b - a) * static_cast<float> (progress);
         g.setGradientFill (juce::ColourGradient (theme::pitchColour (parent->pitches.empty() ? 0 : parent->pitches.front()).withAlpha (0.8f), a,
                                                  theme::pitchColour (e.pitches.empty() ? 0 : e.pitches.front()).withAlpha (0.8f), b, false));
@@ -878,14 +878,14 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
         const auto age = lit ? now - onset->second.ms : 0.0;
         const auto& pitches = lit ? onset->second.pitches : node.pitches;
 
-        // Zona para conectar (el anillo exterior) al pasar el ratón.
+        // Connection zone (the outer ring) on hover.
         if (isActive && node.id == hoverNode && drag == Drag::None)
         {
             g.setColour (colours::accent.withAlpha (0.08f));
             g.fillEllipse (juce::Rectangle<float> (nodeRadius * 2.0f, nodeRadius * 2.0f).withCentre (centre));
         }
 
-        // Ondas de colores vecinos; en un acorde, la última toma el color de su otra nota.
+        // Ripples in neighbouring colours; in a chord, the last one takes its other note's colour.
         if (lit)
         {
             for (int q = 0; q < 3; ++q)
@@ -905,7 +905,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
             }
         }
 
-        // Halo mientras la nota suena.
+        // Halo while the note sounds.
         if (isSounding (layer, node.id))
         {
             const auto halo = radius + 11.0f;
@@ -913,7 +913,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
             g.drawEllipse (juce::Rectangle<float> (2.0f * halo, 2.0f * halo).withCentre (centre), 1.0f);
         }
 
-        // La estrella: gris en reposo, color de su nota al sonar, pastel en el rastro.
+        // The star: grey at rest, its note's colour when sounding, pastel in the trail.
         auto fill = colours::star;
         auto drawRadius = radius;
 
@@ -930,7 +930,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
         g.setColour (fill);
         g.fillEllipse (juce::Rectangle<float> (2.0f * drawRadius, 2.0f * drawRadius).withCentre (centre));
 
-        // Anillo de estado: inalcanzable, inicio o fin.
+        // Status ring: unreachable, start or end.
         if (hasStatusRing)
         {
             const auto ring = (isActive && isUnreachable (layer, node.id)) ? colours::unreachable
@@ -941,7 +941,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
             g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (centre), 1.5f);
         }
 
-        // Selección o destino al conectar: contorno blanco estelar por fuera de todo.
+        // Selection or connection target: starlight-white outline outside everything.
         if (node.id == selected || (isActive && node.id == hoverTarget))
         {
             const auto r = radius + (hasStatusRing ? 10.0f : 6.0f);
@@ -949,8 +949,8 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
             g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (centre), 1.2f);
         }
 
-        // Nombre de las notas arriba a la derecha: tenue, más claro al seleccionar o
-        // al pasar el ratón, y en el color de la nota mientras destella.
+        // Note names at the top right: faint, brighter when selected or hovered,
+        // and in the note's colour while it flashes.
         auto labelColour = colours::textDisabled.brighter (0.25f);
         if ((isActive && node.id == hoverNode) || node.id == selected)
             labelColour = colours::textPrimary;
@@ -968,7 +968,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
         {
             g.setColour (isStart ? colours::nodeStart : colours::nodeEnd);
             g.setFont (theme::sans (11.0f));
-            g.drawText (isStart ? "inicio" : "fin",
+            g.drawText (isStart ? "start" : "end",
                         juce::Rectangle<float> (80.0f, 14.0f).withCentre (centre.translated (0.0f, radius + 16.0f)),
                         juce::Justification::centred);
         }
@@ -977,7 +977,7 @@ void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive
 
 void GraphView::paintPlayhead (juce::Graphics& g) const
 {
-    // La línea vertical solo tiene sentido en el modo línea de tiempo.
+    // The vertical line only makes sense in timeline mode.
     const auto* layer = activeLayer();
     if (layer == nullptr || track->mode != model::PlaybackMode::Timeline || layer->schedule == nullptr)
         return;
@@ -996,7 +996,7 @@ void GraphView::paintEmptyHint (juce::Graphics& g) const
 {
     g.setColour (colours::textSecondary);
     g.setFont (theme::sans (15.0f));
-    g.drawText (text ("Doble clic para crear una estrella · arrastra desde su borde para conectarla"),
+    g.drawText (text ("Double-click to create a star · drag from its edge to connect it"),
                 getLocalBounds().withTrimmedTop (rulerHeight), juce::Justification::centred);
 }
 
@@ -1005,7 +1005,7 @@ bool GraphView::isSounding (const Layer& layer, model::NodeId node) noexcept
     if (layer.schedule == nullptr)
         return false;
 
-    // Solo mientras se reproduce: el destello ya se encarga del resto.
+    // Only while playing: the flash takes care of the rest.
     return std::any_of (layer.schedule->events.begin(), layer.schedule->events.end(), [&layer, node] (const engine::NoteEvent& e)
     {
         return e.node == node && layer.animBeat >= e.startBeat && layer.animBeat < e.startBeat + e.durationBeats

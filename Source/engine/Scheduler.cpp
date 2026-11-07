@@ -24,8 +24,8 @@ namespace
                  model::resolveInstrument (track, node), from };
     }
 
-    // Modo línea de tiempo: no hay árbol, así que el nodo "de origen" es el vecino
-    // conectado que sonó más recientemente antes que él.
+    // Timeline mode: there is no tree, so the "source" node is the connected
+    // neighbour that sounded most recently before it.
     void linkTimelineSources (const model::Track& track, Schedule& schedule)
     {
         for (auto& event : schedule.events)
@@ -52,8 +52,8 @@ namespace
         }
     }
 
-    // Espera en pulsos correspondiente a una arista. Con ajuste al pulso, se redondea a
-    // la subdivisión más cercana, sin bajar de una subdivisión para conservar el orden.
+    // Wait in beats for an edge. With beat snapping, it is rounded to the nearest
+    // subdivision, never below one subdivision so the order is kept.
     double waitBeats (double pixels, double quantize)
     {
         const auto beats = model::pixelsToBeats (pixels);
@@ -74,8 +74,8 @@ namespace
                           });
     }
 
-    // Modo línea de tiempo: cada nodo suena en el pulso x / 100. El ciclo va de la X
-    // del nodo de inicio hasta que acaba de sonar el de fin; lo que queda fuera no suena.
+    // Timeline mode: each node sounds at beat x / 100. The cycle goes from the X of
+    // the start node until the end node finishes sounding; anything outside is silent.
     ScheduleResult scheduleTimeline (const model::Track& track, ScheduleResult result)
     {
         const auto& start = *track.findNode (track.startNode);
@@ -101,8 +101,8 @@ namespace
         return result;
     }
 
-    // Modo algoritmo, hermanos en secuencia: cada nodo empieza después del anterior
-    // visitado, esperando la longitud de la arista que lo une a su padre.
+    // Algorithm mode, siblings in sequence: each node starts after the previously
+    // visited one, waiting the length of the edge that joins it to its parent.
     Schedule scheduleSequential (const model::Track& track, const Tree& tree,
                                  const std::vector<NodeId>& order)
     {
@@ -128,8 +128,8 @@ namespace
         return schedule;
     }
 
-    // Modo algoritmo, hermanos simultáneos: al visitar un nodo suenan con él todos sus
-    // hermanos aún no tocados. El grupo espera la longitud de su arista más corta.
+    // Algorithm mode, simultaneous siblings: visiting a node also plays every sibling
+    // not played yet. The group waits the length of its shortest edge.
     Schedule scheduleSimultaneous (const model::Track& track, const Tree& tree,
                                    const std::vector<NodeId>& order)
     {

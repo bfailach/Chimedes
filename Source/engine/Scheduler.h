@@ -13,9 +13,9 @@ struct ScheduleResult
     enum class Error
     {
         None,
-        Invalid,            // la validación falló: ver `validation`
-        EndBeforeStart,     // modo línea de tiempo con el fin a la izquierda del inicio
-        TreeUnavailable     // el método de árbol no aplica (Prim en un grafo dirigido)
+        Invalid,            // validation failed: see `validation`
+        EndBeforeStart,     // timeline mode with the end node left of the start node
+        TreeUnavailable     // the tree method does not apply (Prim on a directed graph)
     };
 
     Error error = Error::None;
@@ -25,8 +25,8 @@ struct ScheduleResult
     bool ok() const noexcept { return error == Error::None && schedule.has_value(); }
 };
 
-// Calcula el horario de un ciclo de la pista. Es una función pura: no toca
-// audio ni interfaz, y se vuelve a llamar cada vez que la pista cambia.
+// Computes the schedule of one cycle of the track. It is a pure function: it does
+// not touch audio or UI, and is called again every time the track changes.
 ScheduleResult buildSchedule (const model::Track& track);
 
 } // namespace chimedes::engine

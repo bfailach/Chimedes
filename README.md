@@ -1,124 +1,124 @@
 # Chimedes
 
-Aplicación de escritorio para crear música generativa dibujando grafos. Los nodos son notas o acordes; las aristas, las conexiones entre ellos. La música surge al recorrer el grafo, con una línea de tiempo tradicional o con algoritmos de búsqueda.
+A desktop app for making generative music by drawing graphs. Nodes are notes or chords; edges are the connections between them. Music comes out of walking the graph, either along a traditional timeline or with search algorithms.
 
-Escrito en C++20 con [JUCE](https://juce.com) 9.
+Written in C++20 with [JUCE](https://juce.com) 9.
 
-## Estado
+## Status
 
-Fase 1 (versión mínima) completa:
+Phase 1 (minimum version) done:
 
-- [x] Esqueleto del proyecto: CMake, JUCE y ventana con la regla de tiempo
-- [x] Modelo y motor: validación de conexidad, árboles (BFS, DFS, Dijkstra, Prim), recorridos y horarios en ambos modos, con pruebas
-- [x] Audio: transporte con BPM, sintetizador básico y publicación de horarios entre hilos
-- [x] Lienzo editable, panel de propiedades, deshacer y rehacer
-- [x] Ajuste opcional al pulso en el modo algoritmo
-- [x] Interfaz oscura con paneles flotantes, selector de notas con teclado, seis instrumentos integrados y botón Aleatorio
+- [x] Project skeleton: CMake, JUCE and a window with the time ruler
+- [x] Model and engine: connectivity validation, trees (BFS, DFS, Dijkstra, Prim), traversals and schedules in both modes, with tests
+- [x] Audio: transport with BPM, a basic synthesizer and thread-safe schedule publishing
+- [x] Editable canvas, properties panel, undo and redo
+- [x] Optional beat snapping in algorithm mode
+- [x] Dark UI with floating panels, a keyboard note picker, six built-in instruments and a Random button
 
-Fase 2 completa:
+Phase 2 done:
 
-- [x] Modo algoritmo: árboles, recorridos, hermanos en secuencia o a la vez y ajuste al pulso
-- [x] Guardar y abrir proyectos (`.chimedes`)
+- [x] Algorithm mode: trees, traversals, siblings in sequence or together, and beat snapping
+- [x] Save and open projects (`.chimedes`)
 
-Fase 3 completa:
+Phase 3 done:
 
-- [x] Varias pistas que suenan a la vez, cada una con su ciclo
-- [x] Edición en vivo mientras suena
-- [x] Muestras de sonido propias como instrumentos
+- [x] Several tracks playing at once, each with its own cycle
+- [x] Live editing while playing
+- [x] Your own sound samples as instruments
 
-Fase 4 completa:
+Phase 4 done:
 
-- [x] Aleatorizar el grafo, las notas, el ritmo, los instrumentos o el algoritmo, por separado o todo junto
-- [x] Exportar a WAV
-- [x] Exportar a MIDI
+- [x] Randomize the graph, the notes, the rhythm, the instruments or the algorithm, separately or all together
+- [x] Export to WAV
+- [x] Export to MIDI
 
-## Uso
+## Usage
 
-La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de hoja) empieza uno vacío. El lienzo ocupa toda la ventana, con el panel de propiedades flotando a la derecha y el transporte en la barra inferior.
+The app opens with a demo graph; the **New** button (sheet icon) starts an empty one. The canvas fills the whole window, with floating panels: tracks on the left, file actions at the top, properties on the right and the transport at the bottom.
 
-| Acción | Cómo |
+| Action | How |
 | --- | --- |
-| Crear nodo | Doble clic en un espacio vacío (hereda las notas del último nodo seleccionado) |
-| Mover nodo | Arrastrar desde su centro |
-| Conectar | Arrastrar desde el borde de un nodo hasta otro |
-| Seleccionar | Clic en un nodo o una arista |
-| Borrar | Supr o Retroceso, con algo seleccionado |
-| Inicio y fin | Clic derecho en un nodo, o los botones del panel derecho |
-| Notas del nodo | Teclado del panel derecho: clic propone una nota y la hace sonar, Mayús+clic forma acordes; `<` `>` cambian de octava. La propuesta se marca con borde blanco y se guarda con Enter |
-| Instrumento | Panel derecho: uno para la pista y, si quieres, otro para cada nodo |
-| Probar notas | Clic en el teclado del panel o letras **A W S E D F T G Y H U J K O L P** (de do a re♯ de la octava siguiente, desde el primer do visible). Suenan al momento. Varias letras a la vez o Mayús forman un acorde; **Z / X** cambian de octava |
-| Guardar la nota o el acorde | **Enter** (Esc descarta la propuesta) |
-| Nuevo, abrir, guardar | Iconos de hoja, carpeta y disquete de la barra superior (junto al nombre del proyecto), o **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Mayús+S**: guardar como). Antes de cerrar, abrir otro o empezar uno nuevo, si hay cambios sin guardar, la app pregunta |
-| Pistas | Panel izquierdo: clic activa una pista (la que se edita; las demás se ven atenuadas y siguen sonando), doble clic la renombra, el altavoz la silencia, **+** agrega una (hasta 16) y el clic derecho duplica o elimina. Un clic en una estrella atenuada también activa su pista. Todo se puede deshacer |
-| Al azar | Botón **Aleatorio** (icono de dado): un menú para sortear en la pista activa el grafo, las notas, el ritmo, los instrumentos o el algoritmo, todo junto, o todo en todas las pistas. Se puede deshacer |
-| Exportar | Icono de bandeja de la barra superior: **WAV** (audio, 48 kHz y 24 bits) o **MIDI**, eligiendo la duración |
-| Zoom | Rueda del ratón |
-| Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
-| Reproducir / pausa | Barra espaciadora |
-| Deshacer / rehacer | Iconos de flecha de la barra inferior, Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
+| Create a node | Double-click on empty space (it inherits the notes of the last selected node) |
+| Move a node | Drag from its centre |
+| Connect | Drag from the edge of a node to another |
+| Select | Click a node or an edge |
+| Delete | Delete or Backspace, with something selected |
+| Start and end | Right-click a node, or the buttons in the right panel |
+| Node notes | Keyboard in the right panel: a click proposes a note and plays it, Shift+click builds chords; `<` `>` change octave. The proposal gets a white outline and is saved with Enter |
+| Instrument | Right panel: one for the track and, if you like, another for each node |
+| Try notes | Click the panel's keyboard or press **A W S E D F T G Y H U J K O L P** (from C to the D♯ of the next octave, starting at the first visible C). They sound right away. Several letters at once, or Shift, make a chord; **Z / X** change octave |
+| Save the note or chord | **Enter** (Esc discards the proposal) |
+| New, open, save | Sheet, folder and floppy-disk icons in the top bar (next to the project name), or **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Shift+S**: save as). Before closing, opening another project or starting a new one, the app asks if there are unsaved changes |
+| Tracks | Left panel: a click makes a track active (the one you edit; the others are dimmed and keep playing), a double-click renames it, the speaker mutes it, **+** adds one (up to 16) and a right-click duplicates or deletes. Clicking a dimmed star also activates its track. Everything can be undone |
+| Random | **Random** button (dice icon): a menu to randomize the graph, notes, rhythm, instruments or algorithm of the active track, everything at once, or everything on every track. Can be undone |
+| Export | Tray icon in the top bar: **WAV** (audio, 48 kHz, 24-bit) or **MIDI**, choosing the length |
+| Zoom | Mouse wheel |
+| Pan | Drag on empty space, or with the middle button |
+| Play / pause | Space bar |
+| Undo / redo | Arrow icons in the bottom bar, Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z |
 
-Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Anillos de los nodos: verde = inicio, violeta = fin, naranja = inalcanzable. Los nombres de las notas aparecen tenues junto a cada nodo y se aclaran al pasar el ratón o al seleccionarlo; la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
+The first two nodes of an empty track become the start and the end automatically. Node rings: green = start, violet = end, orange = unreachable. Note names show faintly next to each node and brighten on hover or selection; the time ruler only appears in timeline mode. Nodes that cannot be reached from the start are marked in orange, and the track stays silent until that is fixed.
 
-### Aspecto: atlas estelar
+### Look: a star atlas
 
-El lienzo se dibuja como un mapa de estrellas sobre negro suave (tema *Starlight*). Cada nodo es una estrella cuyo tamaño sigue a la intensidad. Al reproducir:
+The canvas is drawn as a star map on soft black (the *Starlight* theme). Each node is a star whose size follows its velocity. During playback:
 
-- una chispa recorre la arista hacia la nota siguiente;
-- la estrella destella en el color de su nota y lanza ondas de colores vecinos (en un acorde, la última onda toma el color de su otra nota);
-- lo recorrido queda como un rastro pastel que se apaga al empezar el ciclo siguiente.
+- a spark travels along the edge towards the next note;
+- the star flashes in its note's colour and sends out ripples in neighbouring colours (in a chord, the last ripple takes its other note's colour);
+- the path played stays as a pastel trail that fades when the next cycle starts.
 
-Los colores siguen la rueda cromática por clase de nota: do rojo, re naranja, mi verde, sol azul, la violeta, si magenta. Un do es del mismo color en cualquier octava, y las teclas seleccionadas en el teclado del panel usan el mismo color. El resto de la interfaz es casi monocroma, con blanco estelar como único acento.
+Colours follow the colour wheel by pitch class: C red, D orange, E green, G blue, A violet, B magenta. A C is the same colour in any octave, and the selected keys on the panel's keyboard use the same colours. The rest of the UI is almost monochrome, with starlight white as the only accent.
 
-Tipografías: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) para la interfaz y [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) para las cifras, ambas con licencia SIL Open Font License (ver `Resources/Fonts`). Van incluidas en el ejecutable.
+Fonts: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) for the UI and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) for figures, both under the SIL Open Font License (see `Resources/Fonts`). They are bundled in the executable.
 
-## Varias pistas
+## Several tracks
 
-Cada pista es un grafo independiente con sus propias opciones (modo, árbol, recorrido, instrumento) y su propio ciclo: una pista de 3 pulsos contra otra de 4 da una polirritmia que se repite cada 12. Todas comparten el BPM y el lienzo; la activa se dibuja entera y las demás atenuadas, con sus destellos al sonar. Las pistas nuevas toman otro instrumento para distinguirlas al oído.
+Each track is an independent graph with its own options (mode, tree, traversal, instrument) and its own cycle: a 3-beat track against a 4-beat one gives a polyrhythm that repeats every 12 beats. All tracks share the BPM and the canvas; the active one is drawn in full and the others dimmed, still flashing as they play. New tracks get a different instrument so they can be told apart by ear.
 
-## Proyectos
+## Projects
 
-Un proyecto se guarda como `.chimedes`: un archivo JSON legible con el BPM, las opciones de la pista y cada nodo y arista en su propia línea. El nombre del archivo aparece en la barra superior y en el título de la ventana, con un punto (•) si hay cambios sin guardar. En Windows se puede abrir un proyecto arrastrándolo sobre `Chimedes.exe` o pasándolo como argumento.
+A project is saved as `.chimedes`: a readable JSON file with the BPM, the track options and every node and edge on its own line. The file name appears in the top bar and in the window title, with a dot (•) when there are unsaved changes. On Windows a project can be opened by dragging it onto `Chimedes.exe` or passing it as an argument.
 
-Al abrir, los campos que falten toman su valor por defecto, los valores fuera de rango se ajustan y se descartan las aristas hacia nodos que no existen, así que un archivo editado a mano no deja la app en un estado imposible. Si el archivo está dañado, el mensaje dice en qué línea. Al guardar se escribe primero en un archivo temporal: si algo falla, el anterior queda intacto.
+When opening, missing fields take their default value, out-of-range values are clamped and edges to nodes that do not exist are dropped, so a hand-edited file never leaves the app in an impossible state. If the file is damaged, the message says on which line. When saving, a temporary file is written first: if anything fails, the previous file stays intact.
 
-## Instrumentos
+## Instruments
 
-Seis instrumentos sintetizados, sin archivos de audio: órgano, piano eléctrico (FM), campana (FM inarmónica), cuerda pulsada (Karplus-Strong), pad (dos sierras desafinadas y filtradas) y bajo. Cada instrumento suena por su propio canal MIDI, así que en una misma pista pueden convivir varios.
+Six synthesized instruments, with no audio files: organ, electric piano (FM), bell (inharmonic FM), plucked string (Karplus-Strong), pad (two detuned, filtered saws) and bass. Each instrument plays on its own MIDI channel, so several can live in the same track.
 
-### Muestras propias
+### Your own samples
 
-En el desplegable de instrumento (de la pista o de un nodo), **Cargar muestra…** abre un archivo WAV, AIFF, FLAC u OGG (hasta 30 segundos) y lo usa como instrumento: la muestra se toma como grabada en do central (C4) y se transpone para cada nota. Un proyecto admite hasta diez muestras; si no hay sitio, se quitan las que nadie usa. Volver a cargar el mismo archivo reutiliza la muestra.
+In the instrument drop-down (of the track or of a node), **Load sample…** opens a WAV, AIFF, FLAC or OGG file (up to 30 seconds) and uses it as an instrument: the sample is taken as recorded at middle C (C4) and transposed for each note. A project holds up to ten samples; when there is no room, the ones nobody uses are removed. Loading the same file again reuses the sample.
 
-El proyecto guarda la ruta del archivo, no el audio. Si la muestra está dentro de la carpeta del proyecto, la ruta se guarda relativa, así que se puede mover o compartir la carpeta entera. Si al abrir falta un archivo, aparece un aviso y esa muestra queda en silencio; el resto del proyecto suena normal.
+The project stores the file's path, not the audio. If the sample is inside the project folder, the path is saved as relative, so the whole folder can be moved or shared. If a file is missing when opening, a warning appears and that sample stays silent; the rest of the project plays normally.
 
-## Aleatorio
+## Random
 
-El dado abre un menú. Todo afecta a la pista activa, salvo la última opción, y se puede deshacer:
+The dice opens a menu. Everything applies to the active track, except the last option, and can be undone:
 
-- **Grafo nuevo**: ver abajo.
-- **Notas**: misma forma, escala y tonalidad nuevas; la melodía sigue las aristas desde el inicio y el fin vuelve a la tónica.
-- **Ritmo**: duraciones e intensidades nuevas, con un carácter para toda la pista (más cortas o largas, más parejas o acentuadas). El nodo de fin conserva su duración, así el ciclo dura lo mismo.
-- **Instrumentos**: el de la pista y, a veces, algunos nodos con otro, entre los integrados y las muestras cargadas.
-- **Algoritmo** (en modo algoritmo): árbol (Prim solo en grafos no dirigidos), recorrido, hermanos y ajuste al pulso.
-- **Todo**, y **Todo, en todas las pistas** (cada una con su propio sorteo, en un solo paso de deshacer).
+- **New graph**: see below.
+- **Notes**: same shape, new scale and key; the melody follows the edges from the start and the end goes back to the tonic.
+- **Rhythm**: new durations and velocities, with one character for the whole track (shorter or longer, more even or more accented). The end node keeps its duration, so the cycle stays the same length.
+- **Instruments**: the track's and, sometimes, a few nodes with another one, from the built-ins and the loaded samples.
+- **Algorithm** (in algorithm mode): tree (Prim only on undirected graphs), traversal, siblings and beat snapping.
+- **Everything**, and **Everything, on every track** (each with its own roll, in a single undo step).
 
-El grafo nuevo es al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas caen sobre una rejilla de pulsos o medios pulsos y la última termina justo al acabar el ciclo, así que el ciclo dura un número entero de pulsos y la música sigue al BPM. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
+The new graph is random: 5 to 14 nodes; a chain, branches, fan or web shape; nodes spread evenly or bunched; variable vertical spread; and an overall length of 4 to 16 beats. Notes land on a grid of beats or half beats and the last one ends exactly when the cycle does, so the cycle lasts a whole number of beats and the music follows the BPM. Notes come from a random scale and key, with the odd chord, and the last note goes back to the tonic. The graph can always be played and the view adjusts to show all of it.
 
-## Exportar
+## Export
 
-Desde el icono de bandeja de la barra superior. Antes de elegir el archivo se elige la duración, con lo que dura a ese BPM:
+From the tray icon in the top bar. Before choosing the file you choose the length, with how long it lasts at the current BPM:
 
-- **Vuelta completa**: hasta que todas las pistas vuelven a coincidir (el mínimo común múltiplo de sus ciclos; una pista de 3 pulsos y otra de 4 dan 12). Si eso pasa de 4096 pulsos, tantas vueltas de la pista más larga como quepan.
-- **1, 2, 4 u 8 vueltas** de la pista más larga.
+- **Full loop**: until every track lines up again (the least common multiple of their cycles; a 3-beat track and a 4-beat one give 12). If that goes over 4096 beats, as many loops of the longest track as fit.
+- **1, 2, 4 or 8 loops** of the longest track.
 
-Solo suenan las pistas no silenciadas.
+Only unmuted tracks play.
 
-- **WAV**: el audio tal como suena, con el mismo motor, instrumentos y muestras, renderizado más rápido que en tiempo real, con barra de progreso y botón de cancelar. Estéreo, 48 kHz, 24 bits, con 2 segundos de cola al final para que las notas se apaguen. Si la mezcla pasa de 0 dB, se baja el volumen entero para que no recorte.
-- **MIDI**: archivo estándar (formato 1) con una pista de tempo y una pista MIDI por cada pista, con su nombre. Cada instrumento va en su canal (el 10, percusión en General MIDI, nunca se usa) y los integrados llevan un programa General MIDI parecido: órgano, piano eléctrico, campanas tubulares, guitarra de nailon, pad cálido y bajo. Las muestras no llevan programa: en el programa de destino se les asigna el sonido que se quiera.
+- **WAV**: the audio exactly as it sounds, with the same engine, instruments and samples, rendered faster than real time with a progress bar and a cancel button. Stereo, 48 kHz, 24-bit, with a 2-second tail at the end so notes can die out. If the mix goes over 0 dB, the whole thing is turned down so it does not clip.
+- **MIDI**: a standard file (format 1) with a tempo track and one MIDI track per track, with its name. Each instrument goes on its own channel (channel 10, General MIDI percussion, is never used) and the built-ins get a similar General MIDI program: organ, electric piano, tubular bells, nylon guitar, warm pad and bass. Samples get no program: assign whatever sound you like in the destination app.
 
-## Compilar
+## Building
 
-Clona con submódulos, porque JUCE vive en `JUCE/`:
+Clone with submodules, because JUCE lives in `JUCE/`:
 
 ```sh
 git clone --recurse-submodules https://github.com/bfailach/Chimedes.git
@@ -127,9 +127,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-Si ya lo clonaste sin submódulos: `git submodule update --init`.
+If you already cloned without submodules: `git submodule update --init`.
 
-En Linux, JUCE necesita estas cabeceras (Ubuntu/Debian):
+On Linux, JUCE needs these headers (Ubuntu/Debian):
 
 ```sh
 sudo apt install libasound2-dev libx11-dev libxrandr-dev libxinerama-dev \
@@ -137,11 +137,11 @@ sudo apt install libasound2-dev libx11-dev libxrandr-dev libxinerama-dev \
   libfreetype-dev libfontconfig1-dev libgl1-mesa-dev
 ```
 
-En Windows basta con Visual Studio 2022 o posterior; en macOS, con Xcode.
+On Windows, Visual Studio 2022 or later is enough; on macOS, Xcode.
 
-## Pruebas
+## Tests
 
-El modelo y el motor no dependen de JUCE, así que sus pruebas compilan en segundos:
+The model and the engine do not depend on JUCE, so their tests build in seconds:
 
 ```sh
 cmake -S . -B build-tests -DCHIMEDES_BUILD_APP=OFF
@@ -149,33 +149,33 @@ cmake --build build-tests
 ./build-tests/chimedes_tests
 ```
 
-## Renderizar sin tarjeta de sonido
+## Rendering without a sound card
 
-`ChimedesRender` se compila junto con la aplicación y renderiza a WAV con el mismo motor de audio: el grafo de demostración, o un proyecto con la misma exportación que la app (`ChimedesRender salida.wav proyecto.chimedes [vueltas, 0 = completa]`):
+`ChimedesRender` is built along with the app and renders to WAV with the same audio engine: the demo graph, or a project using the same export as the app (`ChimedesRender output.wav project.chimedes [loops, 0 = full]`):
 
 ```sh
 ./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2 3
 ```
 
-Modos: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Después van el número de ciclos y, opcionalmente, el instrumento (1 órgano, 2 piano eléctrico, 3 campana, 4 cuerda pulsada, 5 pad, 6 bajo). La herramienta muestra los tiempos esperados de cada nota junto a los ataques que detecta en el audio.
+Modes: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Then come the number of cycles and, optionally, the instrument (1 organ, 2 electric piano, 3 bell, 4 plucked string, 5 pad, 6 bass). The tool prints the expected time of each note next to the onsets it detects in the audio.
 
-## Estructura
+## Structure
 
 ```text
 Source/
-├── model/    Proyecto, pistas, nodos y aristas (C++ puro)
-├── engine/   Validación, árboles, recorridos, horarios y secuenciador (C++ puro)
-├── audio/    Motor de audio y sintetizador (JUCE)
-├── ui/       Interfaz con JUCE
-└── Main.cpp  Punto de entrada de la aplicación
-Tools/        Herramientas de desarrollo (ChimedesRender)
-Tests/        Pruebas del motor
-JUCE/         Submódulo de Git (JUCE 9.0.4)
+├── model/    Project, tracks, nodes and edges (plain C++)
+├── engine/   Validation, trees, traversals, schedules, sequencer and export (plain C++)
+├── audio/    Audio engine, synthesizers and offline rendering (JUCE)
+├── ui/       JUCE user interface
+└── Main.cpp  Application entry point
+Tools/        Development tools (ChimedesRender)
+Tests/        Engine tests
+JUCE/         Git submodule (JUCE 9.0.4)
 ```
 
-## Cómo suena un grafo
+## How a graph sounds
 
-El motor convierte cada pista en un **horario**: la lista de notas de un ciclo con su pulso de inicio. El audio solo reproduce ese horario.
+The engine turns each track into a **schedule**: the list of notes in one cycle with their starting beat. Audio only plays that schedule.
 
-- **Modo línea de tiempo:** cada nodo suena en el pulso `x / 100` (100 px = 1 pulso). El ciclo va del nodo de inicio hasta que acaba de sonar el de fin.
-- **Modo algoritmo:** el grafo se convierte en un árbol con raíz en el nodo de inicio (BFS, DFS, Dijkstra o Prim) y se recorre con BFS o DFS. La espera entre nodos es la longitud de la arista que los une. Los hermanos de una ramificación pueden sonar en secuencia o a la vez.
+- **Timeline mode:** each node sounds at beat `x / 100` (100 px = 1 beat). The cycle runs from the start node until the end node finishes sounding.
+- **Algorithm mode:** the graph is turned into a tree rooted at the start node (BFS, DFS, Dijkstra or Prim) and walked with BFS or DFS. The wait between nodes is the length of the edge joining them. The siblings of a branch can sound in sequence or together.

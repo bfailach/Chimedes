@@ -10,7 +10,7 @@ Adjacency buildAdjacency (const model::Track& track)
     Adjacency adjacency;
 
     for (const auto& node : track.nodes)
-        adjacency[node.id];  // todo nodo tiene entrada, aunque no tenga vecinos
+        adjacency[node.id];  // every node gets an entry, even without neighbours
 
     for (const auto& edge : track.edges)
     {

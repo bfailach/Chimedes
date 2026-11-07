@@ -8,7 +8,7 @@
 
 using namespace chimedes;
 
-TEST ("aleatorio: el grafo siempre se puede reproducir, en todos los modos")
+TEST ("random: the graph can always be played, in every mode")
 {
     int failures = 0;
 
@@ -35,7 +35,7 @@ TEST ("aleatorio: el grafo siempre se puede reproducir, en todos los modos")
     CHECK (failures == 0);
 }
 
-TEST ("aleatorio: cantidad de nodos, inicio a la izquierda y fin a la derecha")
+TEST ("random: node count, start on the left and end on the right")
 {
     for (std::uint32_t seed = 1; seed <= 200; ++seed)
     {
@@ -51,8 +51,8 @@ TEST ("aleatorio: cantidad de nodos, inicio a la izquierda y fin a la derecha")
         CHECK (t.findNode (t.endNode)->x == maxIt->x);
         CHECK (minIt->x >= 0.0);
 
-        // La duración general es una de las previstas: del inicio hasta que termina la
-        // última nota, en pulsos.
+        // The overall length is one of the expected ones: from the start until the
+        // last note ends, in beats.
         const auto span = (maxIt->x - minIt->x) / 100.0 + t.findNode (t.endNode)->durationBeats;
         CHECK (span == 4.0 || span == 6.0 || span == 8.0 || span == 12.0 || span == 16.0);
 
@@ -65,7 +65,7 @@ TEST ("aleatorio: cantidad de nodos, inicio a la izquierda y fin a la derecha")
     }
 }
 
-TEST ("aleatorio: la misma semilla da el mismo grafo y otra semilla, otro")
+TEST ("random: the same seed gives the same graph and another seed, another")
 {
     model::Track a, b, c;
     model::randomizeGraph (a, 1234);
@@ -76,7 +76,7 @@ TEST ("aleatorio: la misma semilla da el mismo grafo y otra semilla, otro")
     CHECK (! (a == c));
 }
 
-TEST ("aleatorio: conserva las opciones de la pista")
+TEST ("random: keeps the track's options")
 {
     model::Track t;
     t.mode = model::PlaybackMode::Algorithm;
@@ -92,10 +92,10 @@ TEST ("aleatorio: conserva las opciones de la pista")
     CHECK (! t.directed);
 }
 
-TEST ("aleatorio: aparecen las cuatro formas y acordes")
+TEST ("random: all four shapes and chords show up")
 {
-    // Señales indirectas de variedad en 200 semillas: cadenas (nadie con más de un
-    // hijo), grafos con ramas, grafos con más aristas que nodos - 1 (red) y acordes.
+    // Indirect signs of variety over 200 seeds: chains (nobody with more than one
+    // child), graphs with branches, graphs with more edges than nodes - 1 (web) and chords.
     int chains = 0, branched = 0, webs = 0, withChords = 0;
 
     for (std::uint32_t seed = 1; seed <= 200; ++seed)
@@ -120,9 +120,9 @@ TEST ("aleatorio: aparecen las cuatro formas y acordes")
     CHECK (withChords > 10);
 }
 
-TEST ("aleatorio: las notas caen en medios pulsos y el ciclo dura pulsos enteros")
+TEST ("random: notes land on half beats and the cycle lasts whole beats")
 {
-    // Si las notas cayeran entre pulsos, la música no seguiría al BPM.
+    // If notes fell between beats, the music would not follow the BPM.
     for (std::uint32_t seed = 1; seed <= 300; ++seed)
     {
         model::Track t;
@@ -137,19 +137,19 @@ TEST ("aleatorio: las notas caen en medios pulsos y el ciclo dura pulsos enteros
 
         CHECK (std::abs (s.cycleLengthBeats - std::round (s.cycleLengthBeats)) < 1e-9);
 
-        // Ninguna nota comparte posición con otra.
+        // No note shares a position with another.
         for (std::size_t i = 1; i < s.events.size(); ++i)
             CHECK (s.events[i].startBeat > s.events[i - 1].startBeat);
     }
 }
 
 // ---------------------------------------------------------------------------
-// Aleatorizar una sola cosa
+// Randomizing one thing only
 // ---------------------------------------------------------------------------
 
 namespace
 {
-    // Igual forma: mismos nodos (id y posición) y mismas aristas.
+    // Same shape: same nodes (id and position) and same edges.
     bool sameShape (const model::Track& a, const model::Track& b)
     {
         if (a.nodes.size() != b.nodes.size() || ! (a.edges == b.edges) || a.startNode != b.startNode || a.endNode != b.endNode)
@@ -170,7 +170,7 @@ namespace
     }
 }
 
-TEST ("aleatorio de notas: cambia las notas, conserva la forma y cierra en la tónica")
+TEST ("random notes: changes the notes, keeps the shape and ends on the tonic")
 {
     for (std::uint32_t seed = 1; seed <= 100; ++seed)
     {
@@ -189,14 +189,14 @@ TEST ("aleatorio de notas: cambia las notas, conserva la forma y cierra en la t�
         CHECK (engine::buildSchedule (t).ok());
     }
 
-    // Misma semilla, mismo resultado.
+    // Same seed, same result.
     auto a = randomTrack (7), b = randomTrack (7);
     model::randomizeNotes (a, 99);
     model::randomizeNotes (b, 99);
     CHECK (a == b);
 }
 
-TEST ("aleatorio de ritmo: conserva la forma y la duración del fin")
+TEST ("random rhythm: keeps the shape and the end node's duration")
 {
     for (std::uint32_t seed = 1; seed <= 100; ++seed)
     {
@@ -212,12 +212,12 @@ TEST ("aleatorio de ritmo: conserva la forma y la duración del fin")
             CHECK (n.velocity >= 30 && n.velocity <= 127);
         }
 
-        // En línea de tiempo el ciclo no cambia de largo.
+        // In timeline mode the cycle keeps its length.
         CHECK (engine::buildSchedule (t).schedule->cycleLengthBeats == engine::buildSchedule (before).schedule->cycleLengthBeats);
     }
 }
 
-TEST ("aleatorio de instrumentos: solo usa los disponibles")
+TEST ("random instruments: only uses the available ones")
 {
     const std::vector<model::InstrumentId> available { 2, 5, 7 };
     for (std::uint32_t seed = 1; seed <= 100; ++seed)
@@ -237,7 +237,7 @@ TEST ("aleatorio de instrumentos: solo usa los disponibles")
     CHECK (t == before);
 }
 
-TEST ("aleatorio de algoritmo: Prim solo en grafos no dirigidos y siempre se puede reproducir")
+TEST ("random algorithm: Prim only on undirected graphs and always playable")
 {
     for (std::uint32_t seed = 1; seed <= 200; ++seed)
     {
@@ -255,14 +255,14 @@ TEST ("aleatorio de algoritmo: Prim solo en grafos no dirigidos y siempre se pue
     }
 }
 
-TEST ("aleatorio de todo: siempre se puede reproducir y respeta las opciones de la pista")
+TEST ("random everything: always playable and keeps the track's options")
 {
     const std::vector<model::InstrumentId> available { 1, 2, 3, 4, 5, 6 };
     for (std::uint32_t seed = 1; seed <= 200; ++seed)
     {
         model::Track t;
         t.id = 4;
-        t.name = "Bajo";
+        t.name = "Bass";
         t.directed = seed % 2 == 0;
         t.mode = seed % 3 == 0 ? model::PlaybackMode::Algorithm : model::PlaybackMode::Timeline;
         const auto before = t;

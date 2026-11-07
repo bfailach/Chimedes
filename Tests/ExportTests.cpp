@@ -13,7 +13,7 @@ using namespace chimedes;
 
 namespace
 {
-    // Lector mínimo del MIDI que escribimos, para comprobarlo.
+    // Minimal reader of the MIDI we write, to check it.
     struct ParsedMidi
     {
         int format = -1, trackCount = -1, division = -1;
@@ -21,8 +21,8 @@ namespace
         std::vector<std::string> names;
         int noteOns = 0, noteOffs = 0;
         std::set<int> channels;
-        std::map<int, int> programs;   // canal → programa
-        bool balanced = true;          // cada note-on con su note-off
+        std::map<int, int> programs;   // channel → program
+        bool balanced = true;          // every note-on with its note-off
         std::uint32_t lastTick = 0;
     };
 
@@ -67,7 +67,7 @@ namespace
                 if (kind == 0xc0) { m.programs[channel] = b[pos++]; continue; }
 
                 const auto pitch = b[pos++];
-                pos++;   // velocidad
+                pos++;   // velocity
                 m.channels.insert (channel);
                 if (kind == 0x90) { ++m.noteOns; ++open[{ channel, pitch }]; }
                 if (kind == 0x80) { ++m.noteOffs; if (--open[{ channel, pitch }] < 0) m.balanced = false; }
@@ -86,13 +86,13 @@ namespace
         model::Project p;
         p.bpm = bpm;
         t.id = 1;
-        t.name = "Melodía";
+        t.name = "Melody";
         p.tracks = { t };
         return p;
     }
 }
 
-TEST ("midi: cabecera, tempo, nombre y una nota por cada nota del horario")
+TEST ("midi: header, tempo, name and one note per scheduled note")
 {
     const auto project = oneTrack (model::makeDemoTrack(), 96.0);
     const auto schedule = *engine::buildSchedule (project.tracks[0]).schedule;
@@ -104,7 +104,7 @@ TEST ("midi: cabecera, tempo, nombre y una nota por cada nota del horario")
     CHECK (m.trackCount == 2);
     CHECK (m.division == 480);
     CHECK (m.microsPerBeat == 625000);   // 96 BPM
-    CHECK (m.names.size() == 2 && m.names[1] == "Melodía");
+    CHECK (m.names.size() == 2 && m.names[1] == "Melody");
 
     int expected = 0;
     for (const auto& e : schedule.events)
@@ -115,35 +115,35 @@ TEST ("midi: cabecera, tempo, nombre y una nota por cada nota del horario")
     CHECK (m.lastTick == static_cast<std::uint32_t> (length * 480));
 }
 
-TEST ("midi: pistas silenciadas fuera, canal 10 nunca, programa General MIDI por instrumento")
+TEST ("midi: muted tracks left out, never channel 10, General MIDI program per instrument")
 {
     model::Project p;
     for (std::uint32_t i = 1; i <= 16; ++i)
     {
         model::Track t;
         t.id = i;
-        t.instrument = i;           // los 16 instrumentos, también los de muestra
+        t.instrument = i;           // all 16 instruments, the sample ones too
         t.muted = i == 3;
         model::randomizeGraph (t, i);
         p.tracks.push_back (t);
     }
 
     const auto m = parse (engine::exportMidi (p, engine::exportLengthBeats (p, 1, 1000.0)));
-    CHECK (m.trackCount == 16);                   // 15 que suenan + tempo
-    CHECK (m.channels.count (9) == 0);            // percusión
-    CHECK (m.programs.at (engine::midiChannelFor (1)) == 16);   // órgano
-    CHECK (m.programs.at (engine::midiChannelFor (6)) == 33);   // bajo
-    CHECK (m.programs.count (engine::midiChannelFor (7)) == 0); // muestra: sin programa
+    CHECK (m.trackCount == 16);                   // 15 playing + tempo
+    CHECK (m.channels.count (9) == 0);            // percussion
+    CHECK (m.programs.at (engine::midiChannelFor (1)) == 16);   // organ
+    CHECK (m.programs.at (engine::midiChannelFor (6)) == 33);   // bass
+    CHECK (m.programs.count (engine::midiChannelFor (7)) == 0); // sample: no program
     CHECK (m.balanced);
 }
 
-TEST ("midi: notas repetidas que se solapan no dejan notas colgadas")
+TEST ("midi: overlapping repeated notes leave no hanging notes")
 {
     auto t = model::makeDemoTrack();
     for (auto& n : t.nodes)
     {
         n.pitches = { 60 };
-        n.durationBeats = 8.0;      // todas se pisan entre sí
+        n.durationBeats = 8.0;      // they all overlap each other
     }
 
     const auto m = parse (engine::exportMidi (oneTrack (t), 16.0));
@@ -151,9 +151,9 @@ TEST ("midi: notas repetidas que se solapan no dejan notas colgadas")
     CHECK (m.noteOns == m.noteOffs);
 }
 
-TEST ("duración: vuelta completa = mínimo común múltiplo de los ciclos")
+TEST ("length: full loop = least common multiple of the cycles")
 {
-    // Dos pistas de 3 y 4 pulsos coinciden cada 12.
+    // Two tracks of 3 and 4 beats line up every 12.
     const auto track = [] (std::uint32_t id, double endX)
     {
         model::Track t;
@@ -168,10 +168,10 @@ TEST ("duración: vuelta completa = mínimo común múltiplo de los ciclos")
     };
 
     model::Project p;
-    p.tracks = { track (1, 200.0), track (2, 300.0) };   // ciclos de 3 y 4 pulsos
+    p.tracks = { track (1, 200.0), track (2, 300.0) };   // cycles of 3 and 4 beats
     CHECK (engine::exportLengthBeats (p, 0, 1000.0) == 12.0);
-    CHECK (engine::exportLengthBeats (p, 3, 1000.0) == 12.0);   // 3 vueltas de la de 4
-    CHECK (engine::exportLengthBeats (p, 0, 10.0) == 8.0);      // tope: vueltas enteras de la más larga
+    CHECK (engine::exportLengthBeats (p, 3, 1000.0) == 12.0);   // 3 loops of the 4-beat one
+    CHECK (engine::exportLengthBeats (p, 0, 10.0) == 8.0);      // cap: whole loops of the longest
 
     p.tracks[0].muted = true;
     CHECK (engine::exportLengthBeats (p, 0, 1000.0) == 4.0);

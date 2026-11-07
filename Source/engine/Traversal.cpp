@@ -29,7 +29,7 @@ std::vector<model::NodeId> visitOrder (const Tree& tree, model::Traversal traver
     }
     else
     {
-        // Preorden: se apilan los hijos al revés para visitar primero el más cercano.
+        // Preorder: children are pushed in reverse so the closest one is visited first.
         std::vector<model::NodeId> stack { tree.root };
 
         while (! stack.empty())

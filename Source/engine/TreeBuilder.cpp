@@ -29,7 +29,7 @@ namespace
         tree.parentEdgeLength[child] = length;
     }
 
-    // Árbol de expansión por anchura: cada nodo cuelga del primero que lo descubre.
+    // Breadth-first spanning tree: each node hangs from the first one that finds it.
     void buildBfs (Tree& tree, const Adjacency& adjacency)
     {
         std::unordered_set<NodeId> seen { tree.root };
@@ -52,7 +52,7 @@ namespace
         }
     }
 
-    // Árbol de expansión por profundidad, iterativo para no agotar la pila.
+    // Depth-first spanning tree, iterative so the stack never overflows.
     void buildDfs (Tree& tree, const Adjacency& adjacency)
     {
         std::unordered_set<NodeId> seen { tree.root };
@@ -79,13 +79,13 @@ namespace
         }
     }
 
-    // Árbol de caminos más cortos desde la raíz, con la longitud de las aristas como peso.
+    // Shortest-path tree from the root, with edge lengths as weights.
     void buildDijkstra (Tree& tree, const Adjacency& adjacency)
     {
         std::unordered_map<NodeId, double> distance { { tree.root, 0.0 } };
         std::unordered_set<NodeId> settled;
 
-        using Item = std::pair<double, NodeId>;  // (distancia, nodo); empates por id
+        using Item = std::pair<double, NodeId>;  // (distance, node); ties by id
         std::priority_queue<Item, std::vector<Item>, std::greater<>> pending;
         pending.push ({ 0.0, tree.root });
 
@@ -115,12 +115,12 @@ namespace
         }
     }
 
-    // Árbol de expansión mínima (Prim) desde la raíz. Solo para grafos no dirigidos.
+    // Minimum spanning tree (Prim) from the root. Undirected graphs only.
     void buildPrim (Tree& tree, const Adjacency& adjacency)
     {
         std::unordered_set<NodeId> inTree { tree.root };
 
-        using Item = std::tuple<double, NodeId, NodeId>;  // (longitud, hijo, padre)
+        using Item = std::tuple<double, NodeId, NodeId>;  // (length, child, parent)
         std::priority_queue<Item, std::vector<Item>, std::greater<>> pending;
 
         const auto addEdgesFrom = [&] (NodeId from)

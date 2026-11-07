@@ -12,14 +12,14 @@ int main()
         test.body();
         const bool passed = failureCount() == before;
 
-        std::cout << (passed ? "  ok     " : "  FALLA  ") << test.name << "\n";
+        std::cout << (passed ? "  ok      " : "  FAILED  ") << test.name << "\n";
 
         if (! passed)
             ++failedTests;
     }
 
-    std::cout << "\n" << registry().size() - static_cast<std::size_t> (failedTests) << " de "
-              << registry().size() << " pruebas pasaron\n";
+    std::cout << "\n" << registry().size() - static_cast<std::size_t> (failedTests) << " of "
+              << registry().size() << " tests passed\n";
 
     return failedTests == 0 ? 0 : 1;
 }

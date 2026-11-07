@@ -14,15 +14,15 @@ namespace
     const juce::Colour whiteKeyHover { 0xffe0e0e0 };
     const juce::Colour blackKey      { 0xff1a1a1a };
 
-    // Para cada semitono de la octava: en las blancas, el índice de la tecla (C = 0 … B = 6);
-    // en las negras, la frontera entre las dos blancas vecinas, donde se centran.
+    // For each semitone of the octave: for white keys, the key index (C = 0 … B = 6);
+    // for black keys, the boundary between the two white neighbours, where they are centred.
     constexpr float semitoneSlot[12] = { 0.0f, 1.0f, 1.0f, 2.0f, 2.0f, 3.0f, 4.0f, 4.0f, 5.0f, 5.0f, 6.0f, 6.0f };
 
-    constexpr int minOctave = -1;  // C-1 = nota MIDI 0
-    constexpr int maxOctave = 8;   // la vista acaba en B9, más allá del MIDI 127
+    constexpr int minOctave = -1;  // C-1 = MIDI note 0
+    constexpr int maxOctave = 8;   // the view ends at B9, beyond MIDI 127
 
-    // Letras del teclado de la computadora, en semitonos desde el primer do visible:
-    // la fila central son las teclas blancas y la de arriba, las negras.
+    // Computer keyboard letters, in semitones from the first visible C:
+    // the middle row are the white keys and the row above, the black ones.
     constexpr const char* keyLayout = "awsedftgyhujkolp";
 
     int semitoneForKey (int keyCode)
@@ -67,7 +67,7 @@ void PianoPicker::setPitches (const std::vector<int>& newPitches)
     std::sort (sorted.begin(), sorted.end());
 
     if (sorted == saved)
-        return;   // la misma selección: se conserva la propuesta en curso
+        return;   // the same selection: the proposal in progress is kept
 
     saved = sorted;
     pending = sorted;
@@ -97,7 +97,7 @@ void PianoPicker::setBaseOctave (int octave)
 
 void PianoPicker::updateRangeLabel()
 {
-    // Si alguna nota elegida queda fuera de vista, el rango se pinta en rojo como aviso.
+    // If any chosen note is out of view, the range is painted as a warning.
     const auto hidden = std::any_of (pending.begin(), pending.end(), [this] (int p)
     {
         return p < lowestPitch() || p >= lowestPitch() + 24;
@@ -131,7 +131,7 @@ juce::Rectangle<float> PianoPicker::keyBounds (int pitch) const
 
 int PianoPicker::pitchAt (juce::Point<float> position) const
 {
-    // Las negras están encima: se miran primero.
+    // Black keys are on top: check them first.
     for (int pass = 0; pass < 2; ++pass)
         for (int p = lowestPitch(); p < lowestPitch() + 24; ++p)
             if (isBlack (p) == (pass == 0) && p >= 0 && p <= 127 && keyBounds (p).contains (position))
@@ -145,7 +145,7 @@ void PianoPicker::mouseExit (const juce::MouseEvent&) { repaint(); }
 
 void PianoPicker::mouseDown (const juce::MouseEvent& e)
 {
-    // Las letras llegan a la ventana: se le devuelve el foco por si lo tenía otro control.
+    // Letters reach the window: give it focus back in case another control had it.
     for (auto* p = getParentComponent(); p != nullptr; p = p->getParentComponent())
         if (p->getWantsKeyboardFocus())
         {
@@ -182,7 +182,7 @@ void PianoPicker::playKey (int pitch, bool asChord, bool toggle)
     {
         if (it == next.end())
             next.push_back (pitch);
-        else if (next.size() > 1)  // un nodo siempre tiene al menos una nota
+        else if (next.size() > 1)  // a node always has at least one note
             next.erase (it);
     }
     else if (asChord)
@@ -195,7 +195,7 @@ void PianoPicker::playKey (int pitch, bool asChord, bool toggle)
         next = { pitch };
     }
 
-    // Suena aunque la tecla ya estuviera en la propuesta: tocar es escuchar.
+    // It sounds even if the key was already in the proposal: playing is listening.
     const bool removed = toggle && it != pending.end() && std::find (next.begin(), next.end(), pitch) == next.end();
     if (! removed && onAudition)
     {
@@ -284,8 +284,8 @@ bool PianoPicker::handleKeyPress (const juce::KeyPress& key)
         return true;
     }
 
-    // Las letras de notas se manejan en handleKeyStateChange (al bajar y al soltar);
-    // aquí solo se reclaman para que no hagan otra cosa.
+    // Note letters are handled in handleKeyStateChange (on press and release);
+    // here they are only claimed so they do nothing else.
     return semitoneForKey (key.getKeyCode()) >= 0;
 }
 
@@ -296,8 +296,8 @@ bool PianoPicker::handleKeyStateChange()
 
     for (int i = 0; keyLayout[i] != 0; ++i)
     {
-        // Como en el teclado MIDI de JUCE: la letra en minúscula; cada sistema la
-        // traduce a su tecla física.
+        // As in JUCE's MIDI keyboard: the lowercase letter; each system maps it
+        // to its physical key.
         const auto lower = static_cast<int> (keyLayout[i]);
         const bool down = juce::KeyPress::isKeyCurrentlyDown (lower);
         const bool wasDown = heldKeyCodes.count (lower) > 0;
@@ -305,7 +305,7 @@ bool PianoPicker::handleKeyStateChange()
 
         if (down && ! wasDown && ! hasCommandModifier (mods))
         {
-            // Otra letra ya sostenida: esta se suma al acorde.
+            // Another letter is already held: this one joins the chord.
             const bool asChord = ! heldKeyCodes.empty();
             heldKeyCodes.insert (lower);
             playKey (pitch, asChord, mods.isShiftDown());
@@ -343,19 +343,19 @@ void PianoPicker::paint (juce::Graphics& g)
 
             auto colour = isBlack (p) ? blackKey : (p == hovered ? whiteKeyHover : whiteKey);
             if (isSelected (p))
-                colour = theme::pitchColour (p);   // la tecla toma el color de su nota
+                colour = theme::pitchColour (p);   // the key takes its note's colour
             if (! playable)
                 colour = theme::control;
 
-            // Tecla sonando: un poco más clara.
+            // Key sounding: a little lighter.
             if (soundingPitches.count (p) > 0)
                 colour = colour.interpolatedWith (juce::Colours::white, 0.35f);
 
             g.setColour (colour);
             g.fillRoundedRectangle (key, 2.0f);
 
-            // Propuesta sin guardar: las teclas nuevas llevan un borde blanco estelar;
-            // las guardadas que se van a quitar, un punto de su color.
+            // Unsaved proposal: new keys get a starlight-white outline;
+            // saved keys about to be removed get a dot in their colour.
             if (proposing && isSelected (p) && ! isSaved (p))
             {
                 g.setColour (theme::accent);
@@ -367,7 +367,7 @@ void PianoPicker::paint (juce::Graphics& g)
                 g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ key.getCentreX(), key.getBottom() - 8.0f }));
             }
 
-            // Etiqueta en cada do, para orientarse.
+            // A label on every C, to find your way.
             if (p % 12 == 0 && ! isSelected (p))
             {
                 g.setColour (juce::Colour (0xff555555));

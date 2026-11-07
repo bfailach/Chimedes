@@ -7,10 +7,10 @@
 using namespace chimedes;
 
 // ---------------------------------------------------------------------------
-// Edición de la pista
+// Track editing
 // ---------------------------------------------------------------------------
 
-TEST ("edición: los dos primeros nodos son el inicio y el fin")
+TEST ("editing: the first two nodes are the start and the end")
 {
     model::Track t;
     const auto a = model::addNode (t, 0, 0);
@@ -22,7 +22,7 @@ TEST ("edición: los dos primeros nodos son el inicio y el fin")
     CHECK (a != b && b != c && a != c);
 }
 
-TEST ("edición: borrar un nodo borra sus aristas y su papel de inicio")
+TEST ("editing: deleting a node deletes its edges and its start role")
 {
     model::Track t;
     const auto a = model::addNode (t, 0, 0);
@@ -37,10 +37,10 @@ TEST ("edición: borrar un nodo borra sus aristas y su papel de inicio")
     CHECK (t.startNode == model::noNode);
     CHECK (t.endNode == b);
 
-    CHECK (! model::removeNode (t, a));  // ya no existe
+    CHECK (! model::removeNode (t, a));  // no longer exists
 }
 
-TEST ("edición: un nodo nuevo ocupa el inicio que quedó libre")
+TEST ("editing: a new node takes the start slot left free")
 {
     model::Track t;
     const auto a = model::addNode (t, 0, 0);
@@ -51,7 +51,7 @@ TEST ("edición: un nodo nuevo ocupa el inicio que quedó libre")
     CHECK (t.startNode == c);
 }
 
-TEST ("edición: no se repiten aristas ni se conecta un nodo consigo mismo")
+TEST ("editing: no duplicate edges and no node connected to itself")
 {
     model::Track t;
     t.directed = true;
@@ -59,20 +59,20 @@ TEST ("edición: no se repiten aristas ni se conecta un nodo consigo mismo")
     const auto b = model::addNode (t, 100, 0);
 
     CHECK (model::addEdge (t, a, b).has_value());
-    CHECK (! model::addEdge (t, a, b).has_value());   // repetida
-    CHECK (! model::addEdge (t, a, a).has_value());   // bucle
-    CHECK (! model::addEdge (t, a, 99).has_value());  // nodo inexistente
-    CHECK (model::addEdge (t, b, a).has_value());     // en dirigido, el sentido contrario es otra arista
+    CHECK (! model::addEdge (t, a, b).has_value());   // duplicate
+    CHECK (! model::addEdge (t, a, a).has_value());   // loop
+    CHECK (! model::addEdge (t, a, 99).has_value());  // missing node
+    CHECK (model::addEdge (t, b, a).has_value());     // when directed, the reverse is a different edge
 
     model::Track u;
     u.directed = false;
     const auto c = model::addNode (u, 0, 0);
     const auto d = model::addNode (u, 100, 0);
     CHECK (model::addEdge (u, c, d).has_value());
-    CHECK (! model::addEdge (u, d, c).has_value());   // en no dirigido es la misma
+    CHECK (! model::addEdge (u, d, c).has_value());   // when undirected it is the same one
 }
 
-TEST ("edición: mover y borrar aristas")
+TEST ("editing: moving and deleting edges")
 {
     model::Track t;
     const auto a = model::addNode (t, 0, 0);
@@ -90,10 +90,10 @@ TEST ("edición: mover y borrar aristas")
 }
 
 // ---------------------------------------------------------------------------
-// Nombres de notas
+// Note names
 // ---------------------------------------------------------------------------
 
-TEST ("notas: nombres con octava, alteraciones y números MIDI")
+TEST ("notes: names with octave, accidentals and MIDI numbers")
 {
     CHECK (model::parsePitch ("C4") == 60);
     CHECK (model::parsePitch ("c4") == 60);
@@ -101,11 +101,11 @@ TEST ("notas: nombres con octava, alteraciones y números MIDI")
     CHECK (model::parsePitch ("F#3") == 54);
     CHECK (model::parsePitch ("Bb2") == 46);
     CHECK (model::parsePitch ("C-1") == 0);
-    CHECK (model::parsePitch ("E") == 64);   // octava 4 por defecto
+    CHECK (model::parsePitch ("E") == 64);   // octave 4 by default
     CHECK (model::parsePitch ("72") == 72);
 }
 
-TEST ("notas: textos inválidos se rechazan")
+TEST ("notes: invalid text is rejected")
 {
     CHECK (! model::parsePitch ("").has_value());
     CHECK (! model::parsePitch ("H4").has_value());
@@ -114,7 +114,7 @@ TEST ("notas: textos inválidos se rechazan")
     CHECK (! model::parsePitch ("G9#").has_value());
 }
 
-TEST ("notas: acordes separados por espacios o comas")
+TEST ("notes: chords separated by spaces or commas")
 {
     const auto chord = model::parsePitches ("C4 E4, G4");
     REQUIRE (chord.has_value());
@@ -124,7 +124,7 @@ TEST ("notas: acordes separados por espacios o comas")
     CHECK (! model::parsePitches ("C4 X9").has_value());
 }
 
-TEST ("notas: de número a nombre y de vuelta")
+TEST ("notes: from number to name and back")
 {
     CHECK (model::pitchName (60) == "C4");
     CHECK (model::pitchName (61) == "C#4");

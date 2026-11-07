@@ -14,11 +14,11 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
-        // El tema se aplica a toda la app, también a menús y ventanas emergentes.
+        // The theme applies to the whole app, including menus and pop-ups.
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         mainWindow = std::make_unique<MainWindow> (getApplicationName());
 
-        // Doble clic en un .chimedes: el sistema pasa la ruta como argumento.
+        // Double-clicking a .chimedes file: the system passes its path as an argument.
         const auto path = commandLine.unquoted().trim();
         if (path.isNotEmpty() && juce::File::isAbsolutePath (path))
             if (auto* content = mainContent())
@@ -33,7 +33,7 @@ public:
 
     void systemRequestedQuit() override
     {
-        // Con cambios sin guardar, primero se pregunta.
+        // With unsaved changes, ask first.
         if (auto* content = mainContent())
             content->confirmDiscardChanges ([] { juce::JUCEApplication::getInstance()->quit(); });
         else
@@ -58,7 +58,7 @@ private:
             setResizable (true, true);
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
-            chimedes::ui::applyDarkTitleBar (*this);  // tras setVisible: necesita la ventana nativa
+            chimedes::ui::applyDarkTitleBar (*this);  // after setVisible: needs the native window
         }
 
         void closeButtonPressed() override
@@ -70,7 +70,7 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };
 
-    chimedes::ui::ChimedesLookAndFeel lookAndFeel;  // debe vivir más que la ventana
+    chimedes::ui::ChimedesLookAndFeel lookAndFeel;  // must outlive the window
     std::unique_ptr<MainWindow> mainWindow;
 };
 

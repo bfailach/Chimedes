@@ -7,9 +7,9 @@
 namespace chimedes::ui
 {
 
-// Botón de acción dibujado como icono de trazo: aleatorio (dado), nuevo (hoja),
-// abrir (carpeta), guardar (disquete), deshacer y rehacer (flecha curva). El nombre
-// aparece como tooltip.
+// Action button drawn as a stroke icon: random (dice), new (sheet), open (folder),
+// save (floppy disk), export (tray), undo and redo (curved arrow), add (plus). The
+// name is shown as a tooltip.
 class IconButton : public juce::Button
 {
 public:
@@ -34,7 +34,7 @@ public:
         const auto colour = isEnabled() ? theme::textPrimary : theme::textDisabled;
         const juce::PathStrokeType stroke (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
 
-        // Los iconos se dibujan en una caja de 18 × 18 centrada.
+        // Icons are drawn in a centred 18 × 18 box.
         const auto box = juce::Rectangle<float> (18.0f, 18.0f).withCentre (bounds.getCentre());
         const auto x = box.getX();
         const auto y = box.getY();
@@ -45,7 +45,7 @@ public:
         {
             case Icon::Random:
             {
-                // Un dado: cuadrado redondeado con la cara del cinco.
+                // A die: rounded square showing the five.
                 const auto face = box.reduced (1.5f);
                 g.drawRoundedRectangle (face, 3.5f, 1.6f);
 
@@ -62,7 +62,7 @@ public:
 
             case Icon::New:
             {
-                // Una hoja con la esquina doblada y un signo más.
+                // A sheet with a folded corner and a plus sign.
                 juce::Path page;
                 page.startNewSubPath (x + 4.0f, y + 1.5f);
                 page.lineTo (x + 11.0f, y + 1.5f);
@@ -86,7 +86,7 @@ public:
 
             case Icon::Export:
             {
-                // Bandeja con una flecha que sale hacia arriba.
+                // A tray with an arrow coming out upwards.
                 juce::Path tray;
                 tray.startNewSubPath (x + 2.0f, y + 10.5f);
                 tray.lineTo (x + 2.0f, y + 16.0f);
@@ -114,7 +114,7 @@ public:
 
             case Icon::Open:
             {
-                // Carpeta con la solapa arriba a la izquierda.
+                // A folder with its tab at the top left.
                 juce::Path folder;
                 folder.startNewSubPath (x + 1.5f, y + 4.0f);
                 folder.lineTo (x + 6.5f, y + 4.0f);
@@ -131,7 +131,7 @@ public:
 
             case Icon::Save:
             {
-                // Disquete: cuerpo con esquina cortada, etiqueta abajo y obturador arriba.
+                // Floppy disk: body with a cut corner, label below and shutter above.
                 juce::Path disk;
                 disk.startNewSubPath (x + 2.0f, y + 2.0f);
                 disk.lineTo (x + 13.0f, y + 2.0f);
@@ -151,7 +151,7 @@ public:
             case Icon::Undo:
             case Icon::Redo:
             {
-                // Flecha curva hacia la izquierda; rehacer es su reflejo.
+                // Arrow curving to the left; redo is its mirror image.
                 juce::Path arrow;
                 arrow.startNewSubPath (x + 15.5f, y + 14.5f);
                 arrow.cubicTo (x + 15.5f, y + 8.0f, x + 11.5f, y + 6.0f, x + 3.0f, y + 6.0f);

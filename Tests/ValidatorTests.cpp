@@ -10,7 +10,7 @@ using Problem = engine::ValidationResult::Problem;
 
 namespace
 {
-    // A -> B <- C : en dirigido, C no es alcanzable desde A.
+    // A -> B <- C : when directed, C cannot be reached from A.
     model::Track arrowsIntoB (bool directed)
     {
         model::Track t;
@@ -23,13 +23,13 @@ namespace
     }
 }
 
-TEST ("validación: una pista vacía no se puede reproducir")
+TEST ("validation: an empty track cannot be played")
 {
     model::Track t;
     CHECK (engine::validate (t).problem == Problem::NoNodes);
 }
 
-TEST ("validación: falta el nodo de inicio o el de fin")
+TEST ("validation: the start or end node is missing")
 {
     auto t = arrowsIntoB (false);
 
@@ -37,11 +37,11 @@ TEST ("validación: falta el nodo de inicio o el de fin")
     CHECK (engine::validate (t).problem == Problem::MissingStart);
 
     t.startNode = 1;
-    t.endNode = 99;  // no existe
+    t.endNode = 99;  // does not exist
     CHECK (engine::validate (t).problem == Problem::MissingEnd);
 }
 
-TEST ("validación: en dirigido se respeta la dirección de las aristas")
+TEST ("validation: when directed, edge direction is followed")
 {
     const auto result = engine::validate (arrowsIntoB (true));
 
@@ -50,7 +50,7 @@ TEST ("validación: en dirigido se respeta la dirección de las aristas")
     CHECK (result.unreachable[0] == 3);
 }
 
-TEST ("validación: el mismo grafo no dirigido es conexo")
+TEST ("validation: the same graph undirected is connected")
 {
     const auto result = engine::validate (arrowsIntoB (false));
 
@@ -58,7 +58,7 @@ TEST ("validación: el mismo grafo no dirigido es conexo")
     CHECK (result.unreachable.empty());
 }
 
-TEST ("validación: un nodo aislado se marca como inalcanzable")
+TEST ("validation: an isolated node is marked unreachable")
 {
     auto t = arrowsIntoB (false);
     t.nodes.push_back (node (4, 500, 500));

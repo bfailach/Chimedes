@@ -14,23 +14,23 @@
 namespace chimedes::ui
 {
 
-// Lienzo del grafo, dibujado como un atlas estelar: cada nodo es una estrella cuyo
-// tamaño sigue a la intensidad. Al reproducir, una chispa recorre la arista hacia la
-// nota siguiente y la estrella destella en el color de su nota (ver theme::pitchColour),
-// con ondas de colores vecinos; lo recorrido queda como un rastro pastel hasta que
-// empieza el ciclo siguiente.
+// Graph canvas, drawn as a star atlas: each node is a star whose size follows its
+// velocity. During playback, a spark travels along the edge towards the next note
+// and the star flashes in its note's colour (see theme::pitchColour), with ripples
+// in neighbouring colours; the path played stays as a pastel trail until the next
+// cycle starts.
 //
-// Con varias pistas, todas se dibujan y se animan a la vez; la pista activa se ve
-// entera y es la única que se edita, las demás quedan atenuadas (un clic en una de
-// sus estrellas la vuelve activa). También es el editor:
+// With several tracks, all of them are drawn and animated at once; the active track
+// is drawn in full and is the only one that can be edited, the others are dimmed (a
+// click on one of their stars makes that track active). It is also the editor:
 //
-//   doble clic en vacío ........ crear nodo
-//   arrastrar el centro ........ mover nodo
-//   arrastrar el borde ......... conectar con otro nodo
-//   clic en nodo o arista ...... seleccionar (Supr borra)
-//   clic derecho ............... marcar inicio o fin, eliminar
-//   rueda ...................... zoom
-//   arrastrar en vacío ......... desplazarse (también con el botón central)
+//   double-click on empty space .. create node
+//   drag the centre .............. move node
+//   drag the edge ................ connect to another node
+//   click a node or edge ......... select (Delete removes it)
+//   right-click .................. mark as start or end, delete
+//   wheel ........................ zoom
+//   drag on empty space .......... pan (also with the middle button)
 class GraphView : public juce::Component
 {
 public:
@@ -39,27 +39,27 @@ public:
 
     GraphView();
 
-    // Una pista para dibujar. Los punteros deben seguir vivos hasta la próxima
-    // llamada a setTracks (la ventana la repite tras cada cambio).
+    // A track to draw. The pointers must stay alive until the next call to
+    // setTracks (the window repeats it after every change).
     struct TrackView
     {
         const model::Track* track = nullptr;
-        std::shared_ptr<const engine::Schedule> schedule;   // nullptr = no suena
+        std::shared_ptr<const engine::Schedule> schedule;   // nullptr = silent
         std::vector<model::NodeId> unreachable;
     };
 
     void setTracks (std::vector<TrackView> tracks, std::size_t activeIndex);
 
-    // Posición global en pulsos desde que empezó la reproducción; cada pista la
-    // convierte a su propio ciclo. `bpm` permite interpolar para animar a 60 fps.
+    // Global position in beats since playback started; each track converts it to
+    // its own cycle. `bpm` allows interpolating to animate at 60 fps.
     void setPlayhead (double positionBeats, bool isPlaying, double bpm);
 
     EditCallbacks callbacks;
     std::function<void (model::NodeId)> onSelectionChanged;
-    std::function<void (std::size_t trackIndex)> onActivateTrack;   // clic en otra pista
+    std::function<void (std::size_t trackIndex)> onActivateTrack;   // click on another track
 
-    // Ajusta zoom y desplazamiento para que todo el grafo quepa en `visibleArea`
-    // (en coordenadas de este componente), sin acercar más allá del 100 %.
+    // Sets zoom and scroll so the whole graph fits in `visibleArea`
+    // (in this component's coordinates), without zooming in past 100 %.
     void zoomToFit (juce::Rectangle<int> visibleArea);
 
     model::NodeId getSelectedNode() const noexcept;
@@ -79,9 +79,9 @@ public:
 private:
     enum class Drag { None, MovingNode, Connecting, Panning };
 
-    // Coordenadas: el modelo usa píxeles con zoom al 100 %; la pantalla aplica zoom
-    // y desplazamiento. `viewOrigin` es el punto del modelo en la esquina superior
-    // izquierda del área bajo la regla.
+    // Coordinates: the model uses pixels at 100 % zoom; the screen applies zoom
+    // and scroll. `viewOrigin` is the model point at the top-left corner of the
+    // area below the ruler.
     juce::Point<float> toScreen (double x, double y) const noexcept;
     juce::Point<float> toScreen (const model::Node& node) const noexcept;
     juce::Point<double> toModel (juce::Point<float> screen) const noexcept;
@@ -93,15 +93,15 @@ private:
     void showNodeMenu (model::NodeId node);
     void setSelection (model::NodeId node, model::EdgeId edge);
 
-    // Estado de la animación de una nota que sonó.
+    // Animation state of a note that sounded.
     struct Onset
     {
-        double ms = 0.0;                    // cuándo empezó a sonar
+        double ms = 0.0;                    // when it started sounding
         std::vector<int> pitches;
         model::NodeId from = model::noNode;
     };
 
-    // Una pista en el lienzo, con su propia animación (cada pista tiene su ciclo).
+    // A track on the canvas, with its own animation (each track has its own cycle).
     struct Layer
     {
         model::TrackId id = 0;
@@ -109,13 +109,13 @@ private:
         std::shared_ptr<const engine::Schedule> schedule;
         std::vector<model::NodeId> unreachable;
 
-        double animBeat = 0.0;                                     // posición en su ciclo
-        std::unordered_map<model::NodeId, Onset> onsets;           // ciclo actual
-        std::unordered_map<model::NodeId, Onset> previousOnsets;   // rastro que se apaga
+        double animBeat = 0.0;                                     // position in its cycle
+        std::unordered_map<model::NodeId, Onset> onsets;           // current cycle
+        std::unordered_map<model::NodeId, Onset> previousOnsets;   // trail fading out
         double cycleStartMs = -1.0e9;
     };
 
-    // Animación de reproducción: se llama en cada refresco de pantalla.
+    // Playback animation: called on every screen refresh.
     void onFrame();
     void detectOnsets (Layer& layer, double fromBeat, double toBeat, double nowMs);
     void startNewCycle (Layer& layer, double nowMs);
@@ -142,10 +142,10 @@ private:
 
     std::vector<Layer> layers;
     std::size_t active = 0;
-    const model::Track* track = nullptr;   // la pista activa (la que se edita)
+    const model::Track* track = nullptr;   // the active track (the one being edited)
 
-    double playheadBeat = 0.0;      // posición global
-    double playheadMs = 0.0;        // cuándo llegó `playheadBeat`
+    double playheadBeat = 0.0;      // global position
+    double playheadMs = 0.0;        // when `playheadBeat` arrived
     double currentBpm = 120.0;
     bool playing = false;
 
@@ -157,17 +157,17 @@ private:
     model::NodeId selectedNode = model::noNode;
     model::EdgeId selectedEdge = 0;
 
-    // Notas y duración que heredan los nodos nuevos (las del último seleccionado).
+    // Notes and duration inherited by new nodes (those of the last selected one).
     std::vector<int> lastPitches { 60 };
     double lastDuration = 1.0;
 
     Drag drag = Drag::None;
     model::NodeId dragNode = model::noNode;
-    juce::Point<double> dragOffset;         // del ratón al centro del nodo, en el modelo
+    juce::Point<double> dragOffset;         // from the mouse to the node centre, in the model
     juce::Point<double> panStartOrigin;
     juce::Point<float> mousePosition;
     model::NodeId hoverTarget = model::noNode;
-    model::NodeId hoverNode = model::noNode;   // bajo el ratón: muestra sus notas
+    model::NodeId hoverNode = model::noNode;   // under the mouse: shows its notes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GraphView)
 };

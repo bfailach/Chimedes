@@ -18,7 +18,7 @@ namespace
         return { start, duration, { pitch }, 100, 0, 1 };
     }
 
-    // Reproduce de `from` a `to` en bloques de `block` pulsos y devuelve los mensajes.
+    // Plays from `from` to `to` in blocks of `block` beats and returns the messages.
     std::vector<Message> play (engine::Sequencer& seq, double from, double to, double block)
     {
         std::vector<Message> out;
@@ -38,7 +38,7 @@ namespace
         return n;
     }
 
-    // Dos notas en un ciclo de 4 pulsos: do en 0 y mi en 2, de 1 pulso cada una.
+    // Two notes in a 4-beat cycle: C at 0 and E at 2, 1 beat each.
     engine::Schedule twoNotes()
     {
         engine::Schedule s;
@@ -48,7 +48,7 @@ namespace
     }
 }
 
-TEST ("secuenciador: repite el horario en ciclos con sus note-off")
+TEST ("sequencer: repeats the schedule in cycles with its note-offs")
 {
     const auto schedule = twoNotes();
     engine::Sequencer seq;
@@ -56,7 +56,7 @@ TEST ("secuenciador: repite el horario en ciclos con sus note-off")
 
     const auto msgs = play (seq, 0.0, 12.0, 0.37);
 
-    // 3 ciclos × 2 notas, cada una con su note-off.
+    // 3 cycles × 2 notes, each with its note-off.
     CHECK (countOn (msgs, 60) == 3);
     CHECK (countOn (msgs, 64) == 3);
     CHECK (msgs.size() == 12);
@@ -76,7 +76,7 @@ TEST ("secuenciador: repite el horario en ciclos con sus note-off")
     CHECK_NEAR (offs[5], 11.0);
 }
 
-TEST ("secuenciador: el resultado no depende del tamaño de bloque")
+TEST ("sequencer: the result does not depend on the block size")
 {
     const auto schedule = twoNotes();
 
@@ -91,7 +91,7 @@ TEST ("secuenciador: el resultado no depende del tamaño de bloque")
     }
 }
 
-TEST ("secuenciador: una nota termina aunque el horario cambie a mitad")
+TEST ("sequencer: a note ends even if the schedule changes halfway")
 {
     engine::Schedule a;
     a.events = { note (0.0, 3.0, 60) };
@@ -105,7 +105,7 @@ TEST ("secuenciador: una nota termina aunque el horario cambie a mitad")
     seq.setSchedule (&a);
     auto msgs = play (seq, 0.0, 1.0, 0.25);
 
-    seq.setSchedule (&b);  // edición en vivo en el pulso 1
+    seq.setSchedule (&b);  // live edit at beat 1
     const auto rest = play (seq, 1.0, 8.0, 0.25);
     msgs.insert (msgs.end(), rest.begin(), rest.end());
 
@@ -121,7 +121,7 @@ TEST ("secuenciador: una nota termina aunque el horario cambie a mitad")
     CHECK (countOn (msgs, 70) == 1);
 }
 
-TEST ("secuenciador: al cambiar de horario sigue desde la posición del ciclo")
+TEST ("sequencer: when the schedule changes it continues from the cycle position")
 {
     const auto schedule = twoNotes();
 
@@ -130,7 +130,7 @@ TEST ("secuenciador: al cambiar de horario sigue desde la posición del ciclo")
     {
         seq.setSchedule (&schedule);
         std::vector<Message> out;
-        // Empieza en el pulso 5: ya pasó el do del segundo ciclo (pulso 4).
+        // Starts at beat 5: the C of the second cycle (beat 4) already went by.
         seq.process (5.0, 7.0, [&out] (double beat, int pitch, int, int, bool on) { out.push_back ({ beat, pitch, on }); });
         return out;
     }();
@@ -141,10 +141,10 @@ TEST ("secuenciador: al cambiar de horario sigue desde la posición del ciclo")
     CHECK_NEAR (msgs[0].beat, 6.0);
 }
 
-TEST ("secuenciador: una nota repetida se apaga antes de volver a sonar")
+TEST ("sequencer: a repeated note is turned off before sounding again")
 {
     engine::Schedule s;
-    s.events = { note (0.0, 3.0, 60) };  // dura más que el ciclo
+    s.events = { note (0.0, 3.0, 60) };  // lasts longer than the cycle
     s.cycleLengthBeats = 2.0;
 
     engine::Sequencer seq;
@@ -160,10 +160,10 @@ TEST ("secuenciador: una nota repetida se apaga antes de volver a sonar")
     CHECK (seq.getNumActiveNotes() == 1);
 }
 
-TEST ("secuenciador: apagar todo deja cero notas activas")
+TEST ("sequencer: all notes off leaves zero active notes")
 {
     engine::Schedule s;
-    s.events = { { 0.0, 4.0, { 60, 64, 67 }, 100, 0, 1 } };  // un acorde largo
+    s.events = { { 0.0, 4.0, { 60, 64, 67 }, 100, 0, 1 } };  // a long chord
     s.cycleLengthBeats = 8.0;
 
     engine::Sequencer seq;
@@ -177,7 +177,7 @@ TEST ("secuenciador: apagar todo deja cero notas activas")
     CHECK (seq.getNumActiveNotes() == 0);
 }
 
-TEST ("secuenciador: sin horario no emite nada")
+TEST ("sequencer: without a schedule it emits nothing")
 {
     engine::Sequencer seq;
     CHECK (play (seq, 0.0, 10.0, 1.0).empty());
@@ -188,7 +188,7 @@ TEST ("secuenciador: sin horario no emite nada")
     CHECK (play (seq, 0.0, 10.0, 1.0).empty());
 }
 
-TEST ("secuenciador: la misma nota en dos instrumentos suena por separado")
+TEST ("sequencer: the same note on two instruments sounds separately")
 {
     engine::Schedule s;
     s.events = { { 0.0, 2.0, { 60 }, 100, 0, 1 }, { 0.0, 2.0, { 60 }, 100, 0, 5 } };
@@ -201,6 +201,6 @@ TEST ("secuenciador: la misma nota en dos instrumentos suena por separado")
     seq.process (0.0, 1.0, [&] (double, int, int, int, bool on) { (on ? ons : offs)++; });
 
     CHECK (ons == 2);
-    CHECK (offs == 0);  // no se cortan entre sí
+    CHECK (offs == 0);  // they do not cut each other
     CHECK (seq.getNumActiveNotes() == 2);
 }

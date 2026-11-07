@@ -5,26 +5,26 @@
 
 #include "model/Track.h"
 
-// Operaciones de edición sobre una pista. Son funciones puras sobre el modelo: la
-// interfaz las llama dentro de una acción de deshacer y luego recalcula el horario.
+// Editing operations on a track. They are pure functions on the model: the UI
+// calls them inside an undo action and then recomputes the schedule.
 namespace chimedes::model
 {
 
 Node* findNodeMutable (Track& track, NodeId id) noexcept;
 
-// Crea un nodo y devuelve su id. Si la pista no tiene nodo de inicio, el nuevo nodo
-// lo será; si ya tiene inicio pero no fin, será el fin. Así una pista nueva se puede
-// reproducir en cuanto tiene dos nodos conectados.
+// Creates a node and returns its id. If the track has no start node, the new node
+// becomes it; if it has a start but no end, it becomes the end. So a new track can
+// be played as soon as it has two connected nodes.
 NodeId addNode (Track& track, double x, double y,
                 std::vector<int> pitches = { 60 }, double durationBeats = 1.0);
 
-// Elimina un nodo y sus aristas. Si era el inicio o el fin, la pista se queda sin él.
+// Deletes a node and its edges. If it was the start or the end, the track loses it.
 bool removeNode (Track& track, NodeId id);
 
 bool moveNode (Track& track, NodeId id, double x, double y);
 
-// Conecta dos nodos. Devuelve nullopt si alguno no existe, si es el mismo nodo o si
-// la arista ya existe (en no dirigidos, también en sentido contrario).
+// Connects two nodes. Returns nullopt if either does not exist, if they are the same
+// node or if the edge already exists (in undirected graphs, also the other way round).
 std::optional<EdgeId> addEdge (Track& track, NodeId from, NodeId to);
 
 bool removeEdge (Track& track, EdgeId id);

@@ -8,16 +8,16 @@
 namespace chimedes::audio
 {
 
-// Una muestra cargada por el usuario, ya decodificada (estéreo, en float).
+// A sample loaded by the user, already decoded (stereo, float).
 struct SampleData
 {
-    int id = 0;                                              // canal MIDI (7..16)
-    std::shared_ptr<const juce::AudioBuffer<float>> buffer;  // compartido entre todas las pistas
+    int id = 0;                                              // MIDI channel (7..16)
+    std::shared_ptr<const juce::AudioBuffer<float>> buffer;  // shared by every track
     double sampleRate = 44100.0;
     int rootNote = 60;
 };
 
-// Sonido de muestra: responde solo a su canal. No copia el audio, lo comparte.
+// Sample sound: only responds to its channel. It does not copy the audio, it shares it.
 struct SampleSound : public juce::SynthesiserSound
 {
     explicit SampleSound (SampleData sampleData) : data (std::move (sampleData)) {}
@@ -28,8 +28,8 @@ struct SampleSound : public juce::SynthesiserSound
     const SampleData data;
 };
 
-// Voz que reproduce una muestra transpuesta (interpolación lineal) con una envolvente
-// corta, para que no haga clic al empezar ni al soltar. No asigna memoria.
+// Voice that plays a transposed sample (linear interpolation) with a short envelope,
+// so it does not click when starting or releasing. It does not allocate.
 class SampleVoice : public juce::SynthesiserVoice
 {
 public:
@@ -50,7 +50,7 @@ public:
         const auto& data = static_cast<SampleSound*> (sound)->data;
         buffer = data.buffer.get();
 
-        // Paso por muestra de salida: transposición en semitonos y ajuste de frecuencias.
+        // Step per output sample: transposition in semitones and sample-rate adjustment.
         step = std::pow (2.0, (midiNote - data.rootNote) / 12.0) * data.sampleRate / getSampleRate();
         position = 0.0;
         level = 0.7f * velocity;
@@ -92,7 +92,7 @@ public:
             const auto index = static_cast<int> (position);
             if (index + 1 >= length)
             {
-                finish();   // la muestra terminó antes que la nota
+                finish();   // the sample ended before the note
                 return;
             }
 
@@ -122,7 +122,7 @@ private:
         clearCurrentNote();
     }
 
-    const juce::AudioBuffer<float>* buffer = nullptr;   // lo mantiene vivo el sonido
+    const juce::AudioBuffer<float>* buffer = nullptr;   // kept alive by the sound
     double position = 0.0;
     double step = 1.0;
     float level = 0.0f;

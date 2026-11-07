@@ -1,11 +1,11 @@
-// Herramienta de desarrollo: renderiza el grafo de demostración a un WAV sin tarjeta
-// de sonido, usando el mismo motor de audio que la aplicación. Sirve para comprobar
-// el audio en máquinas sin altavoces y es la base de la futura exportación a WAV.
+// Development tool: renders the demo graph to a WAV without a sound card,
+// using the same audio engine as the application. Useful to check the audio on
+// machines without speakers.
 //
-// Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6] [bpm]
-//      ChimedesRender <salida.wav> <proyecto.chimedes> [vueltas, 0 = completa]
+// Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument 1-6] [bpm]
+//        ChimedesRender <output.wav> <project.chimedes> [loops, 0 = full]
 //
-// La segunda forma usa exactamente la misma exportación que la app (Exportar audio).
+// The second form uses exactly the same export as the app (Export audio).
 
 #include <iostream>
 
@@ -24,7 +24,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6] [bpm]\n";
+        std::cerr << "Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument 1-6] [bpm]\n";
         return 1;
     }
 
@@ -41,7 +41,7 @@ int main (int argc, char* argv[])
             return 1;
         }
 
-        // Muestras: rutas relativas a la carpeta del proyecto, como en la app.
+        // Samples: paths relative to the project folder, as in the app.
         juce::AudioFormatManager formats;
         formats.registerBasicFormats();
         std::vector<audio::SampleData> samples;
@@ -52,7 +52,7 @@ int main (int argc, char* argv[])
             std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
             if (reader == nullptr)
             {
-                std::cerr << "Falta la muestra " << file.getFullPathName() << "\n";
+                std::cerr << "Missing sample " << file.getFullPathName() << "\n";
                 continue;
             }
             auto buffer = std::make_shared<juce::AudioBuffer<float>> (2, static_cast<int> (reader->lengthInSamples));
@@ -64,10 +64,10 @@ int main (int argc, char* argv[])
 
         const auto loops = argc > 3 ? juce::String (argv[3]).getIntValue() : 0;
         const auto beats = engine::exportLengthBeats (loaded.project, loops, 4096.0);
-        std::cout << "Exportando " << beats << " pulsos a " << loaded.project.bpm << " BPM\n";
+        std::cout << "Exporting " << beats << " beats at " << loaded.project.bpm << " BPM\n";
 
         const auto result = audio::renderProjectToWav (loaded.project, samples, beats, output);
-        std::cout << (result.wasOk() ? "Escrito " + output.getFullPathName() : result.getErrorMessage()) << "\n";
+        std::cout << (result.wasOk() ? "Written " + output.getFullPathName() : result.getErrorMessage()) << "\n";
         return result.wasOk() ? 0 : 1;
     }
     const int cycles = argc > 3 ? juce::String (argv[3]).getIntValue() : 2;
@@ -88,7 +88,7 @@ int main (int argc, char* argv[])
     const auto result = engine::buildSchedule (track);
     if (! result.ok())
     {
-        std::cerr << "La pista no se puede reproducir.\n";
+        std::cerr << "The track cannot be played.\n";
         return 1;
     }
 
@@ -97,8 +97,8 @@ int main (int argc, char* argv[])
     constexpr int blockSize = 512;
     const double bpm = argc > 5 ? juce::String (argv[5]).getDoubleValue() : 120.0;
 
-    std::cout << "Modo " << mode << ": ciclo de " << schedule->cycleLengthBeats << " pulsos\n";
-    std::cout << "Notas esperadas (segundos):";
+    std::cout << "Mode " << mode << ": cycle of " << schedule->cycleLengthBeats << " beats\n";
+    std::cout << "Expected notes (seconds):";
     for (int c = 0; c < cycles; ++c)
         for (const auto& e : schedule->events)
             std::cout << " " << juce::String ((c * schedule->cycleLengthBeats + e.startBeat) * 60.0 / bpm, 3);
@@ -110,7 +110,7 @@ int main (int argc, char* argv[])
     engine.publishSchedule (0, schedule);
     engine.play();
 
-    // Los ciclos pedidos más un segundo para la cola de release.
+    // The requested cycles plus one second for the release tail.
     const auto totalSamples = static_cast<int> ((cycles * schedule->cycleLengthBeats * 60.0 / bpm + 1.0) * sampleRate);
     juce::AudioBuffer<float> rendered (2, totalSamples);
     rendered.clear();
@@ -121,8 +121,8 @@ int main (int argc, char* argv[])
         engine.getNextAudioBlock (juce::AudioSourceChannelInfo (&rendered, start, n));
     }
 
-    // Detección sencilla de ataques: subidas bruscas de energía en ventanas de 5 ms.
-    std::cout << "Ataques detectados (segundos):";
+    // Simple onset detection: sudden rises in energy over 5 ms windows.
+    std::cout << "Detected onsets (seconds):";
     constexpr int window = 240;
     float previous = 0.0f;
     double lastOnset = -1.0;
@@ -142,9 +142,9 @@ int main (int argc, char* argv[])
         previous = rms;
     }
 
-    std::cout << "\nPico: " << rendered.getMagnitude (0, 0, totalSamples)
+    std::cout << "\nPeak: " << rendered.getMagnitude (0, 0, totalSamples)
               << "   RMS: " << rendered.getRMSLevel (0, 0, totalSamples)
-              << "   ataques: " << onsets << "\n";
+              << "   onsets: " << onsets << "\n";
 
     juce::WavAudioFormat wav;
     output.deleteFile();
@@ -156,11 +156,11 @@ int main (int argc, char* argv[])
                                            .withBitsPerSample (24));
     if (writer == nullptr)
     {
-        std::cerr << "No se pudo escribir " << output.getFullPathName() << "\n";
+        std::cerr << "Could not write " << output.getFullPathName() << "\n";
         return 1;
     }
 
     writer->writeFromAudioSampleBuffer (rendered, 0, totalSamples);
-    std::cout << "Escrito " << output.getFullPathName() << "\n";
+    std::cout << "Written " << output.getFullPathName() << "\n";
     return 0;
 }

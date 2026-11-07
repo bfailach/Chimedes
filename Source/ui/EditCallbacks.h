@@ -7,12 +7,12 @@
 namespace chimedes::ui
 {
 
-// Cómo los componentes de la interfaz piden cambios a la pista. Quien posee la pista
-// (MainComponent) los aplica, los registra para deshacer y recalcula el horario.
+// How UI components ask for changes to the track. Whoever owns the track
+// (MainComponent) applies them, records them for undo and recomputes the schedule.
 //
-//   - edit: un cambio puntual, una entrada de deshacer.
-//   - beginGesture / updateGesture / endGesture: un cambio continuo (arrastrar un
-//     nodo, mover un deslizador) que se aplica en vivo y deja una sola entrada.
+//   - edit: a one-off change, one undo entry.
+//   - beginGesture / updateGesture / endGesture: a continuous change (dragging a
+//     node, moving a slider) applied live that leaves a single entry.
 struct EditCallbacks
 {
     using Change = std::function<void (model::Track&)>;

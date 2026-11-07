@@ -9,21 +9,21 @@
 namespace chimedes::engine
 {
 
-// Cuántos pulsos exportar.
-//   cycles = 0: hasta que todas las pistas vuelven a coincidir (el mínimo común
-//               múltiplo de sus ciclos), sin pasar de `maxBeats`.
-//   cycles > 0: esa cantidad de vueltas de la pista más larga.
-// Solo cuentan las pistas que suenan (no silenciadas y con un grafo válido).
-// Devuelve 0 si no suena ninguna.
+// How many beats to export.
+//   cycles = 0: until every track lines up again (the least common multiple of
+//               their cycles), never more than `maxBeats`.
+//   cycles > 0: that many loops of the longest track.
+// Only tracks that sound count (not muted and with a valid graph).
+// Returns 0 if none of them sounds.
 double exportLengthBeats (const model::Project& project, int cycles, double maxBeats);
 
-// Archivo MIDI estándar (formato 1, 480 divisiones por negra): una pista de tempo y
-// una pista MIDI por cada pista que suena, con su nombre. Cada instrumento usa su
-// canal; el 10 (percusión en General MIDI) se evita. Los instrumentos integrados
-// llevan un cambio de programa General MIDI parecido a su sonido.
+// Standard MIDI file (format 1, 480 ticks per quarter note): a tempo track and
+// one MIDI track per sounding track, with its name. Each instrument uses its own
+// channel; channel 10 (General MIDI percussion) is avoided. Built-in instruments
+// get a General MIDI program change close to their sound.
 std::vector<std::uint8_t> exportMidi (const model::Project& project, double lengthBeats);
 
-// Canal MIDI (0..15) de un instrumento en el archivo exportado.
+// MIDI channel (0..15) of an instrument in the exported file.
 int midiChannelFor (model::InstrumentId instrument) noexcept;
 
 } // namespace chimedes::engine

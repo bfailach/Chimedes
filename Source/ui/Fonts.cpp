@@ -5,8 +5,8 @@
 namespace chimedes::ui::theme
 {
 
-// Las fuentes se cargan una vez desde los datos incluidos en el ejecutable
-// (Resources/Fonts, licencia SIL OFL), así se ven igual en todos los sistemas.
+// Fonts are loaded once from the data bundled in the executable
+// (Resources/Fonts, SIL OFL license), so they look the same on every system.
 juce::Typeface::Ptr sansTypeface()
 {
     static const auto typeface = juce::Typeface::createSystemTypefaceFor (BinaryData::SpaceGrotesk_ttf,

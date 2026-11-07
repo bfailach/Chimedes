@@ -2,7 +2,7 @@
 
 #include "model/Track.h"
 
-// Ayudas para construir pistas de prueba de forma legible.
+// Helpers to build test tracks in a readable way.
 namespace chimedes::test
 {
 

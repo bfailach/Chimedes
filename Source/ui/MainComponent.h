@@ -19,9 +19,9 @@
 namespace chimedes::ui
 {
 
-// Ventana principal: transporte arriba, lienzo en el centro y propiedades a la
-// derecha. Es la dueña de la pista: aplica cada cambio, lo registra para deshacer,
-// recalcula el horario y lo publica al audio.
+// Main window: canvas in the middle with floating panels for tracks, file
+// actions, properties and transport. It owns the project: it applies every change,
+// records it for undo, recomputes the schedules and publishes them to audio.
 class MainComponent : public juce::Component,
                       private juce::Timer,
                       private juce::ChangeListener
@@ -37,29 +37,29 @@ public:
     void focusLost (FocusChangeType cause) override;
     void parentHierarchyChanged() override;
 
-    // --- Archivos -------------------------------------------------------------
-    // Si hay cambios sin guardar, pregunta (Guardar / No guardar / Cancelar) y solo
-    // llama a `proceed` si se puede seguir. Lo usa también la app al cerrarse.
+    // --- Files -----------------------------------------------------------------
+    // If there are unsaved changes, asks (Save / Don't save / Cancel) and only
+    // calls `proceed` if it is fine to go on. The app also uses it when closing.
     void confirmDiscardChanges (std::function<void()> proceed);
 
-    // Abre un proyecto (también desde la línea de comandos, al hacer doble clic).
+    // Opens a project (also from the command line, when double-clicking a file).
     void openFile (const juce::File& file);
 
 private:
     class ProjectChange;
 
     void timerCallback() override;
-    void changeListenerCallback (juce::ChangeBroadcaster*) override;  // el historial cambió
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;  // the history changed
 
-    // Cambios a la pista activa (lienzo y panel derecho), con deshacer.
+    // Changes to the active track (canvas and right panel), with undo.
     void applyEdit (const EditCallbacks::Change& change);
     void beginGesture();
     void updateGesture (const EditCallbacks::Change& change);
     void endGesture();
 
-    // Cambios al proyecto (pistas nuevas, borradas, silenciadas...), con deshacer.
+    // Changes to the project (new, deleted, muted tracks...), with undo.
     void applyProjectEdit (const std::function<void (model::Project&)>& change, std::optional<std::size_t> newActive = {});
-    void setProject (const model::Project& newProject, std::size_t newActive);  // deshacer, rehacer, abrir
+    void setProject (const model::Project& newProject, std::size_t newActive);  // undo, redo, open
     void setActiveTrack (std::size_t index);
     void projectChanged();
 
@@ -73,21 +73,21 @@ private:
     void rebuildSchedules();
     void showRandomMenu();
 
-    // Exportar
+    // Export
     enum class ExportKind { Wav, Midi };
     void showExportMenu();
     void exportProject (ExportKind kind);
     model::Project projectForExport() const;
 
-    // Muestras de sonido
-    void syncSamples();                       // decodifica las nuevas y las pasa al motor
-    void loadSample (bool forNode);           // "Cargar muestra…"
+    // Sound samples
+    void syncSamples();                       // decodes new ones and hands them to the engine
+    void loadSample (bool forNode);           // "Load sample…"
     std::shared_ptr<const juce::AudioBuffer<float>> decodeSample (const juce::File& file, double& sampleRate,
                                                                   juce::String& error);
     void togglePlayPause();
     void updateUndoButtons();
 
-    // Archivos
+    // Files
     void newProject();
     void openProject();
     void saveProject (std::function<void (bool saved)> done = {});
@@ -99,7 +99,7 @@ private:
     juce::File defaultFolder() const;
     juce::String projectDisplayName() const;
 
-    // Zona del lienzo que no tapan los paneles (para encuadrar el grafo).
+    // Canvas area not covered by the panels (to frame the graph).
     juce::Rectangle<int> freeCanvasArea() const;
 
     // Audio
@@ -107,25 +107,25 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioSourcePlayer audioPlayer;
 
-    // Datos: el proyecto con todas sus pistas; `active` es la que se edita.
+    // Data: the project with all its tracks; `active` is the one being edited.
     model::Project project;
     std::size_t active = 0;
-    std::vector<std::shared_ptr<const engine::Schedule>> schedules;   // uno por pista
+    std::vector<std::shared_ptr<const engine::Schedule>> schedules;   // one per track
     juce::UndoManager undoManager;
     std::optional<model::Project> gestureStart;
 
-    // Archivo abierto (vacío = sin título) y lo último guardado, para saber si hay cambios.
+    // Open file (empty = untitled) and the last saved state, to know if there are changes.
     juce::File currentFile;
     model::Project savedProject;
     double savedBpm = 120.0;
     std::unique_ptr<juce::FileChooser> fileChooser;
 
-    // Fondo redondeado de la barra inferior flotante.
+    // Rounded background of the floating bars.
     struct FloatingPanel : public juce::Component
     {
         void paint (juce::Graphics& g) override
         {
-            // Forma de píldora: el radio es la mitad de la altura.
+            // Pill shape: the radius is half the height.
             const auto radius = static_cast<float> (getHeight()) * 0.5f;
             g.setColour (theme::panel);
             g.fillRoundedRectangle (getLocalBounds().toFloat(), radius);
@@ -134,22 +134,22 @@ private:
         }
     };
 
-    // Interfaz
-    FloatingPanel topBar;      // archivo: nuevo, abrir, guardar y nombre del proyecto
+    // UI
+    FloatingPanel topBar;      // file: new, open, save, export and the project name
     FloatingPanel bottomBar;
-    FloatingPanel statusBar;   // avisos (nodos inalcanzables, audio): solo si hay alguno
-    TransportButton stopButton { "Detener", TransportButton::Icon::Stop };
-    TransportButton playButton { "Reproducir", TransportButton::Icon::Play };
-    TransportButton pauseButton { "Pausa", TransportButton::Icon::Pause };
+    FloatingPanel statusBar;   // warnings (unreachable nodes, audio): only when there is one
+    TransportButton stopButton { "Stop", TransportButton::Icon::Stop };
+    TransportButton playButton { "Play", TransportButton::Icon::Play };
+    TransportButton pauseButton { "Pause", TransportButton::Icon::Pause };
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
-    IconButton randomButton { "Aleatorio", IconButton::Icon::Random };
-    IconButton newButton { "Nuevo (Ctrl+N)", IconButton::Icon::New };
-    IconButton openButton { "Abrir (Ctrl+O)", IconButton::Icon::Open };
-    IconButton saveButton { "Guardar (Ctrl+S)", IconButton::Icon::Save };
-    IconButton exportButton { "Exportar a WAV o MIDI", IconButton::Icon::Export };
-    IconButton undoButton { "Deshacer (Ctrl+Z)", IconButton::Icon::Undo };
-    IconButton redoButton { "Rehacer (Ctrl+Y)", IconButton::Icon::Redo };
+    IconButton randomButton { "Random", IconButton::Icon::Random };
+    IconButton newButton { "New (Ctrl+N)", IconButton::Icon::New };
+    IconButton openButton { "Open (Ctrl+O)", IconButton::Icon::Open };
+    IconButton saveButton { "Save (Ctrl+S)", IconButton::Icon::Save };
+    IconButton exportButton { "Export to WAV or MIDI", IconButton::Icon::Export };
+    IconButton undoButton { "Undo (Ctrl+Z)", IconButton::Icon::Undo };
+    IconButton redoButton { "Redo (Ctrl+Y)", IconButton::Icon::Redo };
     juce::Label statusLabel;
     juce::Label projectLabel;
     GraphView graphView;
@@ -158,10 +158,10 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
 
     juce::String audioWarning;
-    juce::String sampleWarning;   // muestras que no se encontraron
+    juce::String sampleWarning;   // samples that could not be found
 
-    // Muestras ya decodificadas, por ruta: cargar el mismo archivo dos veces no lo
-    // vuelve a leer, y deshacer / rehacer no toca el disco.
+    // Samples already decoded, by path: loading the same file twice does not read
+    // it again, and undo / redo never touch the disk.
     struct DecodedSample
     {
         std::shared_ptr<const juce::AudioBuffer<float>> buffer;
@@ -169,7 +169,7 @@ private:
     };
     std::map<std::string, DecodedSample> decodedSamples;
     std::vector<model::Sample> syncedSamples;
-    std::vector<audio::SampleData> sampleData;   // las que se pudieron cargar, para exportar
+    std::vector<audio::SampleData> sampleData;   // the ones that loaded, for export
     juce::AudioFormatManager formatManager;
     int timerTicks = 0;
     bool initialFitDone = false;
