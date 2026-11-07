@@ -68,6 +68,9 @@ if(CHIMEDES_BUILD_APP)
         PRODUCT_NAME "Chimedes"
         COMPANY_NAME "bfailach"
         VERSION ${PROJECT_VERSION}
+        # App icon (window, taskbar, executable). Source: Resources/Logo/chimedes-icon.svg
+        ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Logo/chimedes-icon-1024.png"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Logo/chimedes-icon-256.png"
     )
 
     target_sources(Chimedes PRIVATE

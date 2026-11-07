@@ -181,11 +181,11 @@ MainComponent::MainComponent()
     addAndMakeVisible (topBar);
     addAndMakeVisible (bottomBar);
 
-    // Top bar: file actions and the project name.
+    // Top bar: logo, file actions and the project name.
     projectLabel.setColour (juce::Label::textColourId, theme::textPrimary);
     projectLabel.setFont (theme::sans (13.0f));
     projectLabel.setInterceptsMouseClicks (false, false);
-    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &projectLabel })
+    for (auto* c : std::initializer_list<juce::Component*> { &logoMark, &newButton, &openButton, &saveButton, &exportButton, &projectLabel })
         topBar.addAndMakeVisible (c);
     addChildComponent (statusBar);
     statusBar.addAndMakeVisible (statusLabel);
@@ -612,6 +612,7 @@ void MainComponent::timerCallback()
     if (glance != nullptr)
         glance->graph().setPlayhead (engine.getPositionBeats(), engine.isPlaying(), engine.getBpm());
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
+    logoMark.tick (engine.isPlaying());
 
     // Frees old schedules about twice a second.
     if (++timerTicks % 15 == 0)
@@ -701,17 +702,21 @@ void MainComponent::resized()
 
     area.reduce (margin, margin);
 
-    // Top bar, centred and as wide as its content: [new, open, save, export] name •
+    // Top bar, centred and as wide as its content: logo [new, open, save, export] name •
     {
         constexpr int pad = 8;
+        constexpr int logoWidth = 30;
+        constexpr int logoGap = 10;
         const auto nameWidth = juce::jlimit (60, 320, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
                                                           projectLabel.getFont(), projectLabel.getText())) + 8);
-        const auto width = pad + 4 * 40 + 3 * 2 + 12 + nameWidth + 14;
+        const auto width = pad + logoWidth + logoGap + 4 * 40 + 3 * 2 + 12 + nameWidth + 14;
 
         topBar.setBounds (juce::Rectangle<int> (width, topBarHeight)
                               .withCentre ({ getWidth() / 2, topBarY + topBarHeight / 2 }));
 
         auto bar = topBar.getLocalBounds().reduced (pad, 4);
+        logoMark.setBounds (bar.removeFromLeft (logoWidth));
+        bar.removeFromLeft (logoGap);
         newButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (2);
         openButton.setBounds (bar.removeFromLeft (40));

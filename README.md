@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/banner-light.svg">
+    <img src="docs/images/banner-dark.svg" alt="Chimedes — Music from nodes and edges" width="100%">
+  </picture>
+</p>
+
 # Chimedes
 
 A desktop app for making generative music by drawing graphs. Nodes are notes or chords; edges are the connections between them. Music comes out of walking the graph, either along a traditional timeline or with search algorithms.

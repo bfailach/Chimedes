@@ -13,6 +13,7 @@
 #include "ui/GraphView.h"
 #include "ui/IconButton.h"
 #include "ui/Inspector.h"
+#include "ui/LogoMark.h"
 #include "ui/TrackGlance.h"
 #include "ui/TrackList.h"
 #include "ui/TransportButton.h"
@@ -154,7 +155,7 @@ private:
     };
 
     // UI
-    FloatingPanel topBar;      // file: new, open, save, export and the project name
+    FloatingPanel topBar;      // logo, file: new, open, save, export and the project name
     FloatingPanel bottomBar;
     FloatingPanel statusBar;   // warnings (unreachable nodes, audio): only when there is one
     TransportButton stopButton { "Stop", TransportButton::Icon::Stop };
@@ -164,6 +165,7 @@ private:
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
     IconButton randomButton { "Random", IconButton::Icon::Random };
     IconButton randomOptionsButton { "Random options", IconButton::Icon::Options };
+    LogoMark logoMark;
     IconButton newButton { "New (Ctrl+N)", IconButton::Icon::New };
     IconButton openButton { "Open (Ctrl+O)", IconButton::Icon::Open };
     IconButton saveButton { "Save (Ctrl+S)", IconButton::Icon::Save };
