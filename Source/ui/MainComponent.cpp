@@ -17,6 +17,8 @@ namespace
     constexpr int margin = 24;          // separación de los paneles flotantes al borde
     constexpr int inspectorWidth = 270;
     constexpr int barHeight = 52;
+    constexpr int topBarHeight = 44;
+    constexpr int topBarY = GraphView::rulerHeight + 10;   // debajo de la regla de tiempo
 
     juce::String describe (const engine::ScheduleResult& result)
     {
@@ -89,9 +91,7 @@ MainComponent::MainComponent()
         applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); });
 
         // Encuadra el grafo nuevo en la parte del lienzo que no tapan los paneles.
-        graphView.zoomToFit (getLocalBounds().reduced (margin)
-                                 .withTrimmedRight (inspectorWidth + 16)
-                                 .withTrimmedBottom (barHeight + 16));
+        graphView.zoomToFit (freeCanvasArea());
     };
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
@@ -125,13 +125,21 @@ MainComponent::MainComponent()
     // El lienzo ocupa toda la ventana; los paneles flotan encima.
     addAndMakeVisible (graphView);
     addAndMakeVisible (inspector);
+    addAndMakeVisible (topBar);
     addAndMakeVisible (bottomBar);
+
+    // Barra superior: acciones de archivo y el nombre del proyecto.
+    projectLabel.setColour (juce::Label::textColourId, theme::textPrimary);
+    projectLabel.setFont (theme::sans (13.0f));
+    projectLabel.setInterceptsMouseClicks (false, false);
+    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &projectLabel })
+        topBar.addAndMakeVisible (c);
     addChildComponent (statusBar);
     statusBar.addAndMakeVisible (statusLabel);
 
     for (auto* c : std::initializer_list<juce::Component*> {
              &bpmLabel, &bpmSlider, &stopButton, &playButton, &pauseButton,
-             &randomButton, &newButton, &openButton, &saveButton, &undoButton, &redoButton })
+             &randomButton, &undoButton, &redoButton })
         bottomBar.addAndMakeVisible (c);
 
     // --- Audio -------------------------------------------------------------
@@ -354,13 +362,33 @@ void MainComponent::resized()
 
     area.reduce (margin, margin);
 
+    // Barra superior centrada, del ancho de su contenido: [nuevo, abrir, guardar] nombre •
+    {
+        constexpr int pad = 8;
+        const auto nameWidth = juce::jlimit (60, 320, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                                                          projectLabel.getFont(), projectLabel.getText())) + 8);
+        const auto width = pad + 3 * 40 + 2 * 2 + 12 + nameWidth + 14;
+
+        topBar.setBounds (juce::Rectangle<int> (width, topBarHeight)
+                              .withCentre ({ getWidth() / 2, topBarY + topBarHeight / 2 }));
+
+        auto bar = topBar.getLocalBounds().reduced (pad, 4);
+        newButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (2);
+        openButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (2);
+        saveButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (12);
+        projectLabel.setBounds (bar);
+    }
+
     // Barra inferior: mide lo justo para su contenido y queda centrada abajo.
-    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio, nuevo, abrir, guardar]  [deshacer, rehacer]
+    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio]  [deshacer, rehacer]
     constexpr int pad = 12;
     constexpr int groupGap = 20;
     constexpr int bpmWidth = 38 + 170;
     constexpr int transportWidth = 3 * 44;
-    constexpr int actionsWidth = 6 * 40 + 3 * 2 + 14 + 2;
+    constexpr int actionsWidth = 3 * 40 + 14 + 2;
     constexpr int barWidth = pad + bpmWidth + groupGap + transportWidth + groupGap + actionsWidth + pad;
 
     auto barArea = area.removeFromBottom (barHeight);
@@ -377,13 +405,9 @@ void MainComponent::resized()
         pauseButton.setBounds (bar.removeFromLeft (44));
         bar.removeFromLeft (groupGap);
 
-        // Aleatorio y archivo juntos; deshacer y rehacer juntos, un poco más separados.
-        for (auto* b : { &randomButton, &newButton, &openButton, &saveButton })
-        {
-            b->setBounds (bar.removeFromLeft (40));
-            bar.removeFromLeft (2);
-        }
-        bar.removeFromLeft (12);
+        // Aleatorio; deshacer y rehacer juntos, un poco más separados.
+        randomButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (14);
         undoButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (2);
         redoButton.setBounds (bar.removeFromLeft (40));
@@ -429,13 +453,35 @@ void MainComponent::markSaved()
 void MainComponent::updateTitle()
 {
     // "Lyra Nova • — Chimedes": el punto marca cambios sin guardar.
-    const auto name = currentFile == juce::File() ? text ("Sin título") : currentFile.getFileNameWithoutExtension();
+    const auto name = projectDisplayName();
     const auto title = name + (hasUnsavedChanges() ? juce::String::fromUTF8 (" \xe2\x80\xa2") : juce::String())
                      + juce::String::fromUTF8 (" \xe2\x80\x94 Chimedes");
 
     if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
         if (window->getName() != title)
             window->setName (title);
+
+    // El mismo nombre en la barra superior; si cambia de largo, la barra se ajusta.
+    const auto label = projectDisplayName() + (hasUnsavedChanges() ? juce::String::fromUTF8 ("  \xe2\x80\xa2") : juce::String());
+    if (projectLabel.getText() != label)
+    {
+        projectLabel.setText (label, juce::dontSendNotification);
+        projectLabel.setTooltip (currentFile != juce::File() ? currentFile.getFullPathName() : juce::String());
+        resized();
+    }
+}
+
+juce::String MainComponent::projectDisplayName() const
+{
+    return currentFile == juce::File() ? text ("Sin título") : currentFile.getFileNameWithoutExtension();
+}
+
+juce::Rectangle<int> MainComponent::freeCanvasArea() const
+{
+    return getLocalBounds().reduced (margin)
+               .withTrimmedTop (topBarY + topBarHeight + 8 - margin)
+               .withTrimmedRight (inspectorWidth + 16)
+               .withTrimmedBottom (barHeight + 16);
 }
 
 void MainComponent::parentHierarchyChanged()
@@ -557,9 +603,7 @@ void MainComponent::openFile (const juce::File& file)
     setTrack (loaded.project.tracks.front());
     markSaved();
 
-    graphView.zoomToFit (getLocalBounds().reduced (margin)
-                             .withTrimmedRight (inspectorWidth + 16)
-                             .withTrimmedBottom (barHeight + 16));
+    graphView.zoomToFit (freeCanvasArea());
 }
 
 void MainComponent::saveProject (std::function<void (bool)> done)

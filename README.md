@@ -38,7 +38,7 @@ La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de
 | Instrumento | Panel derecho: uno para la pista y, si quieres, otro para cada nodo |
 | Probar notas | Clic en el teclado del panel o letras **A W S E D F T G Y H U J K O L P** (de do a re♯ de la octava siguiente, desde el primer do visible). Suenan al momento. Varias letras a la vez o Mayús forman un acorde; **Z / X** cambian de octava |
 | Guardar la nota o el acorde | **Enter** (Esc descarta la propuesta) |
-| Nuevo, abrir, guardar | Iconos de hoja, carpeta y disquete de la barra inferior, o **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Mayús+S**: guardar como). Antes de cerrar, abrir otro o empezar uno nuevo, si hay cambios sin guardar, la app pregunta |
+| Nuevo, abrir, guardar | Iconos de hoja, carpeta y disquete de la barra superior (junto al nombre del proyecto), o **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Mayús+S**: guardar como). Antes de cerrar, abrir otro o empezar uno nuevo, si hay cambios sin guardar, la app pregunta |
 | Grafo al azar | Botón **Aleatorio** (icono de dado; se puede deshacer) |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
@@ -61,7 +61,7 @@ Tipografías: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) p
 
 ## Proyectos
 
-Un proyecto se guarda como `.chimedes`: un archivo JSON legible con el BPM, las opciones de la pista y cada nodo y arista en su propia línea. El título de la ventana muestra el nombre del archivo y un punto (•) si hay cambios sin guardar. En Windows se puede abrir un proyecto arrastrándolo sobre `Chimedes.exe` o pasándolo como argumento.
+Un proyecto se guarda como `.chimedes`: un archivo JSON legible con el BPM, las opciones de la pista y cada nodo y arista en su propia línea. El nombre del archivo aparece en la barra superior y en el título de la ventana, con un punto (•) si hay cambios sin guardar. En Windows se puede abrir un proyecto arrastrándolo sobre `Chimedes.exe` o pasándolo como argumento.
 
 Al abrir, los campos que falten toman su valor por defecto, los valores fuera de rango se ajustan y se descartan las aristas hacia nodos que no existen, así que un archivo editado a mano no deja la app en un estado imposible. Si el archivo está dañado, el mensaje dice en qué línea. Al guardar se escribe primero en un archivo temporal: si algo falla, el anterior queda intacto.
 

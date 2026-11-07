@@ -71,6 +71,10 @@ private:
     bool hasUnsavedChanges() const;
     void updateTitle();
     juce::File defaultFolder() const;
+    juce::String projectDisplayName() const;
+
+    // Zona del lienzo que no tapan los paneles (para encuadrar el grafo).
+    juce::Rectangle<int> freeCanvasArea() const;
 
     // Audio
     audio::AudioEngine engine;
@@ -104,6 +108,7 @@ private:
     };
 
     // Interfaz
+    FloatingPanel topBar;      // archivo: nuevo, abrir, guardar y nombre del proyecto
     FloatingPanel bottomBar;
     FloatingPanel statusBar;   // avisos (nodos inalcanzables, audio): solo si hay alguno
     TransportButton stopButton { "Detener", TransportButton::Icon::Stop };
@@ -118,6 +123,7 @@ private:
     IconButton undoButton { "Deshacer (Ctrl+Z)", IconButton::Icon::Undo };
     IconButton redoButton { "Rehacer (Ctrl+Y)", IconButton::Icon::Redo };
     juce::Label statusLabel;
+    juce::Label projectLabel;
     GraphView graphView;
     Inspector inspector;
     juce::TooltipWindow tooltips { this, 600 };
