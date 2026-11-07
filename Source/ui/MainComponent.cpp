@@ -348,7 +348,15 @@ void MainComponent::addTrack()
     t.id = nextTrackId (project);
     t.name = nextTrackName (project);
     // Each new track gets a different instrument, so they can be told apart by ear.
-    t.instrument = static_cast<model::InstrumentId> (static_cast<int> (project.tracks.size()) % model::instruments::count + 1);
+    {
+        // A varied order: keys, bass, mallets, pad, strings, pluck…
+        static constexpr std::array<model::InstrumentId, 12> cycle {
+            model::instruments::piano, model::instruments::bass, model::instruments::marimba, model::instruments::pad,
+            model::instruments::strings, model::instruments::pluck, model::instruments::vibraphone, model::instruments::flute,
+            model::instruments::electricPiano, model::instruments::kalimba, model::instruments::choir, model::instruments::synthPluck
+        };
+        t.instrument = cycle[project.tracks.size() % cycle.size()];
+    }
     t.mode = activeTrack().mode;
     t.directed = activeTrack().directed;
 
@@ -877,9 +885,7 @@ void MainComponent::applyRandom (RandomKind kind)
     const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
 
     // Possible instruments: the built-ins and the samples that loaded.
-    std::vector<model::InstrumentId> available;
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-        available.push_back (static_cast<model::InstrumentId> (id));
+    std::vector<model::InstrumentId> available = model::instruments::builtInIds();
     for (const auto& smp : project.samples)
         if (decodedSamples.count (smp.path) > 0)
             available.push_back (smp.id);

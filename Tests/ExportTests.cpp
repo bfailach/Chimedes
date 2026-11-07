@@ -1,12 +1,15 @@
 #include "TestFramework.h"
 
+#include <array>
 #include <cstdint>
+#include <string>
 #include <map>
 #include <set>
 
 #include "engine/Export.h"
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
+#include "model/Instruments.h"
 #include "model/Randomizer.h"
 
 using namespace chimedes;
@@ -117,24 +120,85 @@ TEST ("midi: header, tempo, name and one note per scheduled note")
 
 TEST ("midi: muted tracks left out, never channel 10, General MIDI program per instrument")
 {
+    // 16 tracks: built-ins (old and new ids) and samples.
+    const std::array<model::InstrumentId, 16> ids { 1, 6, 3, 7, 17, 25, 9, 32, 2, 4, 5, 20, 26, 28, 8, 30 };
+
     model::Project p;
     for (std::uint32_t i = 1; i <= 16; ++i)
     {
         model::Track t;
         t.id = i;
-        t.instrument = i;           // all 16 instruments, the sample ones too
+        t.instrument = ids[i - 1];
         t.muted = i == 3;
         model::randomizeGraph (t, i);
         p.tracks.push_back (t);
     }
 
+    const auto channels = engine::midiChannels (p);
+    CHECK (channels.size() == 15);                // the muted bell is left out
+    CHECK (channels.count (model::instruments::bell) == 0);
+    CHECK (channels.at (1) == 0 && channels.at (6) == 1 && channels.at (7) == 2);
+
+    std::set<int> distinct;
+    for (const auto& [id, channel] : channels)
+        distinct.insert (channel);
+    CHECK (distinct.size() == 15);                // 15 instruments, 15 channels
+    CHECK (distinct.count (9) == 0);
+
     const auto m = parse (engine::exportMidi (p, engine::exportLengthBeats (p, 1, 1000.0)));
     CHECK (m.trackCount == 16);                   // 15 playing + tempo
     CHECK (m.channels.count (9) == 0);            // percussion
-    CHECK (m.programs.at (engine::midiChannelFor (1)) == 16);   // organ
-    CHECK (m.programs.at (engine::midiChannelFor (6)) == 33);   // bass
-    CHECK (m.programs.count (engine::midiChannelFor (7)) == 0); // sample: no program
+    CHECK (m.programs.at (channels.at (1)) == 16);    // organ
+    CHECK (m.programs.at (channels.at (6)) == 33);    // bass
+    CHECK (m.programs.at (channels.at (17)) == 0);    // piano
+    CHECK (m.programs.at (channels.at (25)) == 48);   // strings
+    CHECK (m.programs.count (channels.at (7)) == 0);  // sample: no program
     CHECK (m.balanced);
+}
+
+TEST ("midi: more than 15 instruments share channels again, still never channel 10")
+{
+    model::Project p;
+    std::uint32_t trackId = 1;
+    for (const auto id : model::instruments::builtInIds())
+    {
+        model::Track t;
+        t.id = trackId++;
+        t.instrument = id;
+        model::randomizeGraph (t, t.id);
+        p.tracks.push_back (t);
+    }
+
+    const auto channels = engine::midiChannels (p);
+    CHECK (channels.size() == model::instruments::builtIns.size());
+    for (const auto& [id, channel] : channels)
+        CHECK (channel >= 0 && channel <= 15 && channel != 9);
+
+    const auto m = parse (engine::exportMidi (p, engine::exportLengthBeats (p, 1, 1000.0)));
+    CHECK (m.balanced);
+    CHECK (m.channels.count (9) == 0);
+}
+
+TEST ("instruments: the catalogue is consistent")
+{
+    std::set<model::InstrumentId> seen;
+    for (const auto& i : model::instruments::builtIns)
+    {
+        CHECK (seen.insert (i.id).second);                      // unique ids
+        CHECK (! model::instruments::isSample (i.id));          // never a sample id
+        CHECK (i.id >= 1 && i.id <= model::instruments::maxId);
+        CHECK (i.gmProgram >= 0 && i.gmProgram <= 127);
+        CHECK (std::string (i.name).size() > 0);
+        CHECK (model::instruments::isValid (i.id));
+    }
+    CHECK (seen.size() == 22);
+
+    // The original six keep their ids (project files store them).
+    CHECK (std::string (model::instruments::name (1)) == "Organ");
+    CHECK (std::string (model::instruments::name (6)) == "Bass");
+    CHECK (! model::instruments::isValid (0));
+    CHECK (! model::instruments::isValid (33));
+    CHECK (model::instruments::isValid (16));                   // last sample
 }
 
 TEST ("midi: overlapping repeated notes leave no hanging notes")

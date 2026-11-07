@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -19,11 +20,13 @@ double exportLengthBeats (const model::Project& project, int cycles, double maxB
 
 // Standard MIDI file (format 1, 480 ticks per quarter note): a tempo track and
 // one MIDI track per sounding track, with its name. Each instrument uses its own
-// channel; channel 10 (General MIDI percussion) is avoided. Built-in instruments
-// get a General MIDI program change close to their sound.
+// channel (see midiChannels); channel 10 (General MIDI percussion) is avoided.
+// Built-in instruments get a General MIDI program change close to their sound.
 std::vector<std::uint8_t> exportMidi (const model::Project& project, double lengthBeats);
 
-// MIDI channel (0..15) of an instrument in the exported file.
-int midiChannelFor (model::InstrumentId instrument) noexcept;
+// MIDI channel (0..15) of each instrument the sounding tracks use, in the order
+// they first appear. There are 15 usable channels: from the 16th instrument on,
+// channels are shared again from the first one.
+std::map<model::InstrumentId, int> midiChannels (const model::Project& project);
 
 } // namespace chimedes::engine

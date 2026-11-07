@@ -2,7 +2,7 @@
 // using the same audio engine as the application. Useful to check the audio on
 // machines without speakers.
 //
-// Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument 1-6] [bpm]
+// Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument id] [bpm]
 //        ChimedesRender <output.wav> <project.chimedes> [loops, 0 = full]
 //
 // The second form uses exactly the same export as the app (Export audio).
@@ -24,7 +24,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument 1-6] [bpm]\n";
+        std::cerr << "Usage: ChimedesRender <output.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [cycles] [instrument id] [bpm]\n";
         return 1;
     }
 

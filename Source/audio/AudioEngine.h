@@ -9,6 +9,7 @@
 
 #include "engine/Schedule.h"
 #include "engine/Sequencer.h"
+#include "audio/InstrumentSynth.h"
 #include "audio/SampleSynth.h"
 
 namespace chimedes::audio
@@ -77,7 +78,7 @@ private:
         std::atomic<const engine::Schedule*> pending { nullptr };  // written by the UI
         std::atomic<const engine::Schedule*> inUse { nullptr };    // written by audio
         engine::Sequencer sequencer;
-        juce::Synthesiser synth;
+        InstrumentSynthesiser synth;
         juce::MidiBuffer midi;
     };
 
@@ -96,7 +97,7 @@ private:
     };
 
     void pushPreview (const PreviewMessage& message) noexcept;
-    void renderPreview (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+    void collectPreview();
 
     void renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer,
                       int startSample, int numSamples, double fromBeat, double beatsPerSample);
@@ -113,11 +114,18 @@ private:
     double sampleRate = 44100.0;
     double position = 0.0;  // audio only
 
+    // Everything is mixed here first: channels 0-1 dry, 2-3 the reverb send.
+    // Blocks longer than it are rendered in pieces.
+    juce::AudioBuffer<float> mix { 4, 1024 };
+    juce::Reverb reverb;
+    double sendCoefficient = 0.98;          // high-pass on the send, so the room is not boomy
+    std::array<double, 2> sendState {}, sendPrevious {};
+
     // Lock-free queue from the UI to audio (one producer, one consumer).
     static constexpr int previewQueueSize = 256;
     juce::AbstractFifo previewFifo { previewQueueSize };
     std::array<PreviewMessage, previewQueueSize> previewQueue {};
-    juce::Synthesiser previewSynth;
+    InstrumentSynthesiser previewSynth;
     juce::MidiBuffer previewMidi;
 
     static constexpr int sampleVoicesPerTrack = 12;

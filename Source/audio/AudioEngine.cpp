@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include "audio/InstrumentSynth.h"
 
 namespace chimedes::audio
 {
@@ -19,9 +18,8 @@ AudioEngine::AudioEngine()
     {
         slot = std::make_unique<TrackSlot>();
 
-        // One sound per instrument, each on its own MIDI channel.
-        for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-            slot->synth.addSound (new InstrumentSound (id));
+        // One sound for every built-in (they share a channel; see InstrumentSynth.h).
+        slot->synth.addSound (new InstrumentSound());
 
         for (int i = 0; i < voicesPerTrack; ++i)
             slot->synth.addVoice (new InstrumentVoice());
@@ -30,8 +28,16 @@ AudioEngine::AudioEngine()
             slot->synth.addVoice (new SampleVoice());
     }
 
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-        previewSynth.addSound (new InstrumentSound (id));
+    previewSynth.addSound (new InstrumentSound());
+
+    // A soft, fairly large room. Each instrument decides how much it sends to it.
+    juce::Reverb::Parameters room;
+    room.roomSize = 0.8f;
+    room.damping = 0.55f;
+    room.wetLevel = 0.3f;
+    room.dryLevel = 0.0f;
+    room.width = 1.0f;
+    reverb.setParameters (room);
 
     for (int i = 0; i < 16; ++i)
         previewSynth.addVoice (new InstrumentVoice());
@@ -46,9 +52,15 @@ AudioEngine::~AudioEngine() = default;
 // Audio thread
 // ---------------------------------------------------------------------------
 
-void AudioEngine::prepareToPlay (int, double newSampleRate)
+void AudioEngine::prepareToPlay (int samplesPerBlockExpected, double newSampleRate)
 {
     sampleRate = newSampleRate;
+    mix.setSize (4, std::max (1024, samplesPerBlockExpected));
+    reverb.setSampleRate (newSampleRate);
+    reverb.reset();
+    sendCoefficient = std::exp (-juce::MathConstants<double>::twoPi * 180.0 / newSampleRate);
+    sendState = {};
+    sendPrevious = {};
 
     for (auto& slot : slots)
     {
@@ -100,31 +112,84 @@ void AudioEngine::getNextAudioBlock (const juce::AudioSourceChannelInfo& block)
     const bool isRunning = playing.load();
     const auto beatsPerSample = bpm.load() / (60.0 * sampleRate);
 
-    for (auto& slot : slots)
+    collectPreview();   // at the start of the first piece
+
+    auto& out = *block.buffer;
+    const auto outChannels = out.getNumChannels();
+
+    for (int done = 0; done < block.numSamples;)
     {
+        const auto n = std::min (block.numSamples - done, mix.getNumSamples());
+        mix.clear (0, n);
+
+        for (auto& slot : slots)
+        {
+            if (isRunning)
+            {
+                renderTrack (*slot, mix, 0, n, position, beatsPerSample);
+            }
+            else
+            {
+                slot->midi.clear();  // no new notes, but release tails keep sounding
+                slot->synth.renderNextBlock (mix, slot->midi, 0, n);
+            }
+        }
+
         if (isRunning)
+            position += n * beatsPerSample;
+
+        previewSynth.renderNextBlock (mix, previewMidi, 0, n);
+        previewMidi.clear();
+
+        for (int c = 0; c < 2; ++c)
         {
-            renderTrack (*slot, *block.buffer, block.startSample, block.numSamples, position, beatsPerSample);
+            auto* s = mix.getWritePointer (2 + c);
+            auto& y = sendState[static_cast<std::size_t> (c)];
+            auto& x1 = sendPrevious[static_cast<std::size_t> (c)];
+            for (int i = 0; i < n; ++i)
+            {
+                const auto x = static_cast<double> (s[i]);
+                y = sendCoefficient * (y + x - x1);     // one-pole high-pass, about 180 Hz
+                x1 = x;
+                s[i] = static_cast<float> (y);
+            }
         }
-        else
+        reverb.processStereo (mix.getWritePointer (2), mix.getWritePointer (3), n);
+
+        const auto* dryL = mix.getReadPointer (0);
+        const auto* dryR = mix.getReadPointer (1);
+        const auto* wetL = mix.getReadPointer (2);
+        const auto* wetR = mix.getReadPointer (3);
+        const auto start = block.startSample + done;
+
+        if (outChannels == 1)
         {
-            slot->midi.clear();  // no new notes, but release tails keep sounding
-            slot->synth.renderNextBlock (*block.buffer, slot->midi, block.startSample, block.numSamples);
+            auto* o = out.getWritePointer (0, start);
+            for (int i = 0; i < n; ++i)
+                o[i] += 0.5f * (dryL[i] + wetL[i] + dryR[i] + wetR[i]);
         }
+        else if (outChannels >= 2)
+        {
+            auto* oL = out.getWritePointer (0, start);
+            auto* oR = out.getWritePointer (1, start);
+            for (int i = 0; i < n; ++i)
+            {
+                oL[i] += dryL[i] + wetL[i];
+                oR[i] += dryR[i] + wetR[i];
+            }
+        }
+
+        done += n;
     }
 
     if (isRunning)
-    {
-        position += block.numSamples * beatsPerSample;
         positionBeats.store (position);
-    }
-
-    renderPreview (*block.buffer, block.startSample, block.numSamples);
 }
 
-void AudioEngine::renderPreview (juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
+void AudioEngine::collectPreview()
 {
     previewMidi.clear();
+    constexpr int startSample = 0;
 
     const auto scope = previewFifo.read (previewFifo.getNumReady());
     const auto take = [&] (int start, int count)
@@ -132,7 +197,9 @@ void AudioEngine::renderPreview (juce::AudioBuffer<float>& buffer, int startSamp
         for (int i = start; i < start + count; ++i)
         {
             const auto& m = previewQueue[static_cast<std::size_t> (i)];
-            const auto channel = std::clamp (m.instrument, 1, 16);
+            const auto channel = engineChannelFor (m.instrument);
+            if (channel == builtInChannel)
+                previewMidi.addEvent (juce::MidiMessage::programChange (channel, m.instrument), startSample);
 
             if (m.pitch < 0)
                 previewMidi.addEvent (juce::MidiMessage::allNotesOff (channel), startSample);
@@ -144,8 +211,6 @@ void AudioEngine::renderPreview (juce::AudioBuffer<float>& buffer, int startSamp
     };
     take (scope.startIndex1, scope.blockSize1);
     take (scope.startIndex2, scope.blockSize2);
-
-    previewSynth.renderNextBlock (buffer, previewMidi, startSample, numSamples);
 }
 
 void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer,
@@ -158,7 +223,11 @@ void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer
     slot.sequencer.process (fromBeat, toBeat, [&] (double beat, int pitch, int velocity, int instrument, bool isNoteOn)
     {
         const auto offset = std::clamp (static_cast<int> ((beat - fromBeat) / beatsPerSample), 0, numSamples - 1);
-        const auto channel = std::clamp (instrument, 1, 16);  // the MIDI channel picks the instrument
+        // Samples: their own channel. Built-ins: the shared channel, after a
+        // program change that says which instrument (see InstrumentSynth.h).
+        const auto channel = engineChannelFor (instrument);
+        if (channel == builtInChannel)
+            slot.midi.addEvent (juce::MidiMessage::programChange (channel, instrument), startSample + offset);
 
         const auto message = isNoteOn
             ? juce::MidiMessage::noteOn (channel, pitch, static_cast<juce::uint8> (std::clamp (velocity, 1, 127)))
@@ -279,8 +348,9 @@ void AudioEngine::previewNoteOff (int pitch, int instrument) noexcept
 
 void AudioEngine::previewAllNotesOff() noexcept
 {
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-        pushPreview ({ -1, 0, id });
+    pushPreview ({ -1, 0, static_cast<int> (model::instruments::organ) });   // every built-in
+    for (auto id = model::instruments::firstSample; id <= model::instruments::lastSample; ++id)
+        pushPreview ({ -1, 0, static_cast<int> (id) });
 }
 
 void AudioEngine::setBpm (double newBpm) noexcept

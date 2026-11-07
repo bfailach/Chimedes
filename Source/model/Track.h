@@ -63,7 +63,7 @@ struct Track
     // of this subdivision (in beats). 0 = no snapping, free waits.
     double quantizeBeats = 0.0;
 
-    InstrumentId instrument = 1;    // see model/Instruments.h (1 = organ)
+    InstrumentId instrument = 17;   // see model/Instruments.h (17 = piano)
     bool muted = false;
 
     // Returns the node with that id, or nullptr if it does not exist.

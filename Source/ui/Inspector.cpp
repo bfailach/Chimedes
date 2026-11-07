@@ -381,11 +381,24 @@ void Inspector::rebuildInstrumentBoxes()
     nodeInstrumentBox.clear (juce::dontSendNotification);
     nodeInstrumentBox.addItem ("Same as track", nodeUsesTrackItem);
 
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+    // Grouped by category, each group under its heading.
+    for (std::size_t c = 0; c < model::instruments::categoryNames.size(); ++c)
     {
-        const auto name = text (model::instruments::name (static_cast<model::InstrumentId> (id)));
-        trackInstrumentBox.addItem ("Instrument: " + name, id);
-        nodeInstrumentBox.addItem (name, id + 1);
+        const auto category = static_cast<model::instruments::Category> (c);
+        const auto heading = text (model::instruments::categoryNames[c]);
+        trackInstrumentBox.addSectionHeading (heading);
+        nodeInstrumentBox.addSectionHeading (heading);
+
+        for (const auto& info : model::instruments::builtIns)
+        {
+            if (info.category != category)
+                continue;
+
+            const auto id = static_cast<int> (info.id);
+            const auto name = text (info.name);
+            trackInstrumentBox.addItem ("Instrument: " + name, id);
+            nodeInstrumentBox.addItem (name, id + 1);
+        }
     }
 
     if (! sampleChoices.empty())

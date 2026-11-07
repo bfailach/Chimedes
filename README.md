@@ -20,7 +20,7 @@ Phase 1 (minimum version) done:
 - [x] Audio: transport with BPM, a basic synthesizer and thread-safe schedule publishing
 - [x] Editable canvas, properties panel, undo and redo
 - [x] Optional beat snapping in algorithm mode
-- [x] Dark UI with floating panels, a keyboard note picker, six built-in instruments and a Random button
+- [x] Dark UI with floating panels, a keyboard note picker, 22 built-in instruments and a Random button
 
 Phase 2 done:
 
@@ -91,7 +91,20 @@ When opening, missing fields take their default value, out-of-range values are c
 
 ## Instruments
 
-Six synthesized instruments, with no audio files: organ, electric piano (FM), bell (inharmonic FM), plucked string (Karplus-Strong), pad (two detuned, filtered saws) and bass. Each instrument plays on its own MIDI channel, so several can live in the same track.
+22 synthesized instruments, with no audio files, grouped in the drop-downs by family:
+
+| Family | Instruments | How they are made |
+|---|---|---|
+| Keys | Piano, Electric piano, Organ, Harpsichord, Music box | Piano: stretched partials on two slightly detuned strings (the beating gives its two-stage decay) and a hammer thump. Electric piano: FM whose bark follows velocity, with stereo tremolo. Organ: seven drawbars, key click and a slow rotating-speaker shimmer. Harpsichord: bright plucked string. Music box: clamped steel tine |
+| Mallets | Bell, Marimba, Vibraphone, Kalimba, Steel drum | Modal synthesis: each partial is a decaying sinusoid at the ratios of the real object (church-bell partials, bars tuned 1:4:10, tines, the octave and twelfth of a steel pan). The vibraphone has its motor tremolo |
+| Strings | Plucked string, Harp, Strings | Karplus-Strong strings with a fractional delay (in tune up to the top notes), plucked at a point along the string. Strings: an ensemble of detuned sawtooths with delayed vibrato |
+| Winds | Flute, Brass, Choir | Flute: breathy tone with a chiff and vibrato. Brass: sawtooths whose filter opens with the attack, with a small pitch scoop. Choir: six voices through the formants of an "ah" |
+| Synth | Pad, Lead, Synth pluck | Band-limited oscillators (PolyBLEP) through a state-variable filter |
+| Bass | Bass, Sub bass, Acid bass | Round filtered saw, pure sub, and a resonant filter that snaps shut |
+
+Everything is in stereo, louder and brighter with velocity, and balanced so every instrument sounds about as loud as the others. Each instrument sends some of its sound to a shared room reverb (more for bells, pads and choir, almost none for basses). Several instruments can live in the same track, even holding the same note at once.
+
+Projects made before keep their instruments: ids 1 to 6 are the original six and ids 17 to 32 the new ones (7 to 16 are samples). New tracks start on the piano.
 
 ### Your own samples
 
@@ -122,7 +135,7 @@ From the tray icon in the top bar. Before choosing the file you choose the lengt
 Only unmuted tracks play.
 
 - **WAV**: the audio exactly as it sounds, with the same engine, instruments and samples, rendered faster than real time with a progress bar and a cancel button. Stereo, 48 kHz, 24-bit, with a 2-second tail at the end so notes can die out. If the mix goes over 0 dB, the whole thing is turned down so it does not clip.
-- **MIDI**: a standard file (format 1) with a tempo track and one MIDI track per track, with its name. Each instrument goes on its own channel (channel 10, General MIDI percussion, is never used) and the built-ins get a similar General MIDI program: organ, electric piano, tubular bells, nylon guitar, warm pad and bass. Samples get no program: assign whatever sound you like in the destination app.
+- **MIDI**: a standard file (format 1) with a tempo track and one MIDI track per track, with its name. Each instrument goes on its own channel (channel 10, General MIDI percussion, is never used; with more than 15 instruments, channels are shared again) and the built-ins get a similar General MIDI program (piano, marimba, string ensemble, choir aahs, synth bass…). Samples get no program: assign whatever sound you like in the destination app.
 
 ## Building
 
@@ -165,7 +178,7 @@ cmake --build build-tests
 ./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2 3
 ```
 
-Modes: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Then come the number of cycles and, optionally, the instrument (1 organ, 2 electric piano, 3 bell, 4 plucked string, 5 pad, 6 bass). The tool prints the expected time of each note next to the onsets it detects in the audio.
+Modes: `timeline`, `seq-bfs`, `seq-dfs`, `sim-bfs`. Then come the number of cycles and, optionally, the instrument id (see `Source/model/Instruments.h`: 1 organ, 6 bass, 17 piano, 25 strings, 28 choir…). The tool prints the expected time of each note next to the onsets it detects in the audio.
 
 ## Structure
 

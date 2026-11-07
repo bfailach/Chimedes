@@ -1,6 +1,7 @@
 #include "engine/Export.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numeric>
 #include <set>
@@ -31,21 +32,8 @@ namespace
         return out;
     }
 
-    // General MIDI program close to each built-in instrument.
-    int gmProgram (model::InstrumentId id)
-    {
-        namespace ids = model::instruments;
-        switch (id)
-        {
-            case ids::organ:         return 16;  // drawbar organ
-            case ids::electricPiano: return 4;   // electric piano 1
-            case ids::bell:          return 14;  // tubular bells
-            case ids::pluck:         return 24;  // nylon guitar
-            case ids::pad:           return 89;  // warm pad
-            case ids::bass:          return 33;  // electric bass (finger)
-            default:                 return -1;  // samples: no program change
-        }
-    }
+    // Channels in assignment order: 1..9 and 11..16 (zero-based 0..8 and 10..15).
+    constexpr std::array<int, 15> usableChannels { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15 };
 
     struct Writer
     {
@@ -114,12 +102,17 @@ namespace
     }
 }
 
-int midiChannelFor (model::InstrumentId instrument) noexcept
+std::map<model::InstrumentId, int> midiChannels (const model::Project& project)
 {
-    // Instrument 1..9 → channels 1..9; 10..15 → 11..16; 16 shares channel 16.
-    // (Zero-based: 0..8 and 10..15; 9 is General MIDI percussion.)
-    const auto id = std::clamp (static_cast<int> (instrument), 1, 16);
-    return id <= 9 ? id - 1 : std::min (id, 15);
+    std::map<model::InstrumentId, int> channels;
+    for (const auto& [track, schedule] : soundingTracks (project))
+        for (const auto& e : schedule.events)
+            if (channels.count (e.instrument) == 0)
+            {
+                const auto next = channels.size() % usableChannels.size();
+                channels.emplace (e.instrument, usableChannels[next]);
+            }
+    return channels;
 }
 
 double exportLengthBeats (const model::Project& project, int cycles, double maxBeats)
@@ -154,6 +147,8 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
 {
     const auto tracks = soundingTracks (project);
     const auto endTick = toTicks (lengthBeats);
+    const auto channels = midiChannels (project);
+    const auto channelOf = [&channels] (model::InstrumentId id) { return channels.at (id); };
 
     Writer file;
     file.text ("MThd");
@@ -184,8 +179,8 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
         // Program change at the start on every built-in instrument channel.
         std::set<std::pair<int, int>> programs;
         for (const auto& e : schedule.events)
-            if (const auto program = gmProgram (e.instrument); program >= 0)
-                programs.insert ({ midiChannelFor (e.instrument), program });
+            if (const auto program = model::instruments::gmProgram (e.instrument); program >= 0)
+                programs.insert ({ channelOf (e.instrument), program });
         for (const auto& [channel, program] : programs)
             events.push_back ({ 0, -1, { static_cast<std::uint8_t> (0xc0 | channel), static_cast<std::uint8_t> (program) } });
 
@@ -203,7 +198,7 @@ std::vector<std::uint8_t> exportMidi (const model::Project& project, double leng
                 const auto end = std::min (start + e.durationBeats, lengthBeats);
                 for (const auto pitch : e.pitches)
                     notes.push_back ({ toTicks (start), std::max (toTicks (start) + 1, toTicks (end)),
-                                       midiChannelFor (e.instrument), std::clamp (pitch, 0, 127), std::clamp (e.velocity, 1, 127) });
+                                       channelOf (e.instrument), std::clamp (pitch, 0, 127), std::clamp (e.velocity, 1, 127) });
             }
 
         // The same note on the same channel cannot overlap in MIDI: the previous one
