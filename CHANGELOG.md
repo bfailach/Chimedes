@@ -6,6 +6,16 @@ All notable changes to Chimedes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-07
+
+### Download
+
+- **`Chimedes-0.1.1-windows-x64.exe`**: the app on its own. Download it and run it; nothing to install.
+- **`Chimedes-0.1.1-windows-x64.zip`**: the same executable with the licence files.
+- **`SHA256SUMS.txt`**: checksums to verify the downloads.
+
+Windows may show a SmartScreen warning because the executable is not code-signed yet: choose **More info → Run anyway**.
+
 ### Changed
 
 - The app now opens with *Carousel*, an original waltz for kalimba drawn as a ring of stars that rise and fall with the melody.
@@ -34,5 +44,6 @@ Windows may show a SmartScreen warning because the executable is not code-signed
 - **Export** to WAV (stereo, 48 kHz, 24-bit) and to standard MIDI files.
 - **Starlight theme**: the canvas is a star atlas that lights up in each note's colour during playback.
 
-[Unreleased]: https://github.com/bfailach/Chimedes/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bfailach/Chimedes/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/bfailach/Chimedes/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bfailach/Chimedes/releases/tag/v0.1.0
