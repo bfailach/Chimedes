@@ -292,14 +292,17 @@ void MainComponent::setProject (const model::Project& newProject, std::size_t ne
                            || newActive >= newProject.tracks.size()
                            || project.tracks[newActive].id != newProject.tracks[newActive].id;
 
+    // Otra pista: la selección del lienzo era de la anterior. Se limpia antes de
+    // reemplazar el proyecto: el lienzo todavía apunta a las pistas actuales y, si el
+    // vector de pistas cambia de tamaño, esos punteros dejan de ser válidos hasta que
+    // projectChanged() le pase los nuevos.
+    if (trackChanged)
+        graphView.selectNode (model::noNode);
+
     project = newProject;
     if (project.tracks.empty())
         project.tracks.push_back ({});
     active = std::min (newActive, project.tracks.size() - 1);
-
-    // Otra pista: la selección del lienzo era de la anterior.
-    if (trackChanged)
-        graphView.selectNode (model::noNode);
 
     projectChanged();
 }
