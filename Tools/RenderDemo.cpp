@@ -18,7 +18,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6]\n";
+        std::cerr << "Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6] [bpm]\n";
         return 1;
     }
 
@@ -49,7 +49,7 @@ int main (int argc, char* argv[])
     const auto schedule = std::make_shared<const engine::Schedule> (*result.schedule);
     constexpr double sampleRate = 48000.0;
     constexpr int blockSize = 512;
-    constexpr double bpm = 120.0;
+    const double bpm = argc > 5 ? juce::String (argv[5]).getDoubleValue() : 120.0;
 
     std::cout << "Modo " << mode << ": ciclo de " << schedule->cycleLengthBeats << " pulsos\n";
     std::cout << "Notas esperadas (segundos):";

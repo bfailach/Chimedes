@@ -73,6 +73,7 @@ MainComponent::MainComponent()
     bpmSlider.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 44, 24);
     bpmSlider.onValueChange = [this] { engine.setBpm (bpmSlider.getValue()); };
 
+    newButton.setTooltip (text ("Nuevo: lienzo vacío (se puede deshacer)"));
     newButton.onClick = [this]
     {
         // Pista vacía con las mismas opciones; se puede deshacer.
@@ -322,13 +323,14 @@ void MainComponent::resized()
         pauseButton.setBounds (transport.removeFromLeft (44));
 
         auto right = bar.removeFromRight (bar.getWidth() / 2 - 3 * 22 - 12);
-        redoButton.setBounds (right.removeFromRight (84));
-        right.removeFromRight (6);
-        undoButton.setBounds (right.removeFromRight (90));
-        right.removeFromRight (6);
-        newButton.setBounds (right.removeFromRight (72));
-        right.removeFromRight (6);
-        randomButton.setBounds (right.removeFromRight (92));
+        // Iconos: deshacer y rehacer juntos; aleatorio y nuevo, separados un poco más.
+        redoButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (2);
+        undoButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (14);
+        newButton.setBounds (right.removeFromRight (40));
+        right.removeFromRight (2);
+        randomButton.setBounds (right.removeFromRight (40));
 
         auto left = bar.removeFromLeft (bar.getWidth() - 3 * 44 - 12);
         bpmLabel.setBounds (left.removeFromLeft (38));

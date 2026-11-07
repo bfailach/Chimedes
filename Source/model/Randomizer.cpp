@@ -26,6 +26,7 @@ namespace
 
     constexpr std::array<double, 5> spansInBeats { 4.0, 6.0, 8.0, 12.0, 16.0 };
     constexpr std::array<double, 5> noteDurations { 0.5, 1.0, 1.0, 1.5, 2.0 };
+    constexpr std::array<double, 4> endDurations { 1.0, 1.0, 2.0, 2.0 };
 
     class Dice
     {
@@ -59,28 +60,53 @@ void randomizeGraph (Track& track, std::uint32_t seed)
 
     const auto count = dice.between (5, 14);
     const auto shape = static_cast<Shape> (dice.between (0, 3));
-    // Duración general al azar, pero con al menos medio pulso por nodo para que no se encimen.
+    // Duración general al azar, con al menos medio pulso por nota (contando la última)
+    // para que quepan todas en la rejilla sin encimarse.
     std::vector<double> spans;
     for (const auto beats : spansInBeats)
-        if (beats >= 0.5 * (count - 1))
+        if (beats >= 0.5 * count)
             spans.push_back (beats);
-    const auto spanPixels = beatsToPixels (spans[static_cast<std::size_t> (dice.between (0, static_cast<int> (spans.size()) - 1))]);
+    const auto spanBeats = spans[static_cast<std::size_t> (dice.between (0, static_cast<int> (spans.size()) - 1))];
     const auto verticalSpread = dice.between (120.0, 420.0);   // cercanía
     const auto clustering = dice.between (0.6, 1.7);           // < 1: apiñados al final; > 1: al principio
 
     const auto& scale = scales[static_cast<std::size_t> (dice.between (0, static_cast<int> (scales.size()) - 1))];
     const auto root = dice.between (0, 11);
 
-    // --- Posiciones: repartidas de 0 a la duración elegida, con algo de irregularidad ---
-    std::vector<double> xs (static_cast<std::size_t> (count));
+    // --- Ritmo: las notas caen sobre una rejilla de pulsos (o medios pulsos) y la
+    // última termina justo al acabar la duración elegida. Así el ciclo dura un número
+    // entero de pulsos y la música sigue al BPM en vez de sonar a destiempo. ---
+    auto endDuration = dice.pick (endDurations);
+    // Deja sitio para todas las notas: con muchas, el final se acorta (mínimo medio pulso).
+    endDuration = std::max (0.5, std::min (endDuration, spanBeats - 0.5 * (count - 1)));
+    const auto usableBeats = spanBeats - endDuration;
+    auto grid = dice.chance (0.6) ? 0.5 : 1.0;
+    if (usableBeats / grid + 1.0 < count)
+        grid = 0.5;
+
+    // Posiciones repartidas de 0 al final, con algo de irregularidad, ajustadas a la rejilla.
+    std::vector<double> beats (static_cast<std::size_t> (count));
     for (int i = 0; i < count; ++i)
     {
         auto u = static_cast<double> (i) / (count - 1);
         if (i > 0 && i < count - 1)
             u = std::clamp (u + dice.between (-0.35, 0.35) / (count - 1), 0.02, 0.98);
-        xs[static_cast<std::size_t> (i)] = std::pow (u, clustering) * spanPixels;
+        beats[static_cast<std::size_t> (i)] = std::round (std::pow (u, clustering) * usableBeats / grid) * grid;
     }
-    std::sort (xs.begin(), xs.end());
+    std::sort (beats.begin(), beats.end());
+
+    // Ninguna nota comparte posición: al menos un paso de rejilla entre vecinas,
+    // con la primera en 0 y la última al final.
+    beats.front() = 0.0;
+    beats.back() = usableBeats;
+    for (std::size_t i = 1; i + 1 < beats.size(); ++i)
+        beats[i] = std::max (beats[i], beats[i - 1] + grid);
+    for (std::size_t i = beats.size() - 1; i-- > 0;)
+        beats[i] = std::min (beats[i], beats[i + 1] - grid);
+
+    std::vector<double> xs;
+    for (const auto b : beats)
+        xs.push_back (beatsToPixels (b));
 
     // --- Nodos ---
     std::vector<Node> nodes;
@@ -90,7 +116,7 @@ void randomizeGraph (Track& track, std::uint32_t seed)
     {
         Node n;
         n.id = static_cast<NodeId> (i + 1);
-        n.x = std::round (xs[static_cast<std::size_t> (i)]);
+        n.x = xs[static_cast<std::size_t> (i)];
         n.y = std::round (shape == Shape::Chain && i > 0
                               ? std::clamp (nodes.back().y + dice.between (-0.35, 0.35) * verticalSpread, 40.0, 40.0 + verticalSpread)
                               : 40.0 + dice.between (0.0, verticalSpread));
@@ -152,9 +178,9 @@ void randomizeGraph (Track& track, std::uint32_t seed)
             n.pitches = { pitchOf (scale, root, d) };
     }
 
-    // El último nodo cierra la frase: tónica y algo más largo.
+    // El último nodo cierra la frase en la tónica y dura hasta el final del ciclo.
     nodes.back().pitches = { pitchOf (scale, root, 0) };
-    nodes.back().durationBeats = std::max (nodes.back().durationBeats, 1.5);
+    nodes.back().durationBeats = endDuration;
 
     track.nodes = std::move (nodes);
     track.edges = std::move (edges);

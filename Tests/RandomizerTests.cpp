@@ -1,6 +1,7 @@
 #include "TestFramework.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "engine/Scheduler.h"
 #include "model/Randomizer.h"
@@ -50,8 +51,9 @@ TEST ("aleatorio: cantidad de nodos, inicio a la izquierda y fin a la derecha")
         CHECK (t.findNode (t.endNode)->x == maxIt->x);
         CHECK (minIt->x >= 0.0);
 
-        // La duración general es una de las previstas (de inicio a fin, en pulsos).
-        const auto span = (maxIt->x - minIt->x) / 100.0;
+        // La duración general es una de las previstas: del inicio hasta que termina la
+        // última nota, en pulsos.
+        const auto span = (maxIt->x - minIt->x) / 100.0 + t.findNode (t.endNode)->durationBeats;
         CHECK (span == 4.0 || span == 6.0 || span == 8.0 || span == 12.0 || span == 16.0);
 
         for (const auto& n : t.nodes)
@@ -116,4 +118,27 @@ TEST ("aleatorio: aparecen las cuatro formas y acordes")
     CHECK (branched > 10);
     CHECK (webs > 10);
     CHECK (withChords > 10);
+}
+
+TEST ("aleatorio: las notas caen en medios pulsos y el ciclo dura pulsos enteros")
+{
+    // Si las notas cayeran entre pulsos, la música no seguiría al BPM.
+    for (std::uint32_t seed = 1; seed <= 300; ++seed)
+    {
+        model::Track t;
+        model::randomizeGraph (t, seed);
+
+        const auto result = engine::buildSchedule (t);
+        CHECK (result.ok());
+        const auto& s = *result.schedule;
+
+        for (const auto& e : s.events)
+            CHECK (std::abs (e.startBeat * 2.0 - std::round (e.startBeat * 2.0)) < 1e-9);
+
+        CHECK (std::abs (s.cycleLengthBeats - std::round (s.cycleLengthBeats)) < 1e-9);
+
+        // Ninguna nota comparte posición con otra.
+        for (std::size_t i = 1; i < s.events.size(); ++i)
+            CHECK (s.events[i].startBeat > s.events[i - 1].startBeat);
+    }
 }

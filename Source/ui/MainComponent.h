@@ -9,6 +9,7 @@
 #include "engine/Schedule.h"
 #include "model/Track.h"
 #include "ui/GraphView.h"
+#include "ui/IconButton.h"
 #include "ui/Inspector.h"
 #include "ui/TransportButton.h"
 
@@ -80,10 +81,10 @@ private:
     TransportButton pauseButton { "Pausa", TransportButton::Icon::Pause };
     juce::Label bpmLabel { {}, "BPM" };
     juce::Slider bpmSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxLeft };
-    juce::TextButton randomButton { "Aleatorio" };
-    juce::TextButton newButton { "Nuevo" };
-    juce::TextButton undoButton { "Deshacer" };
-    juce::TextButton redoButton { "Rehacer" };
+    IconButton randomButton { "Aleatorio", IconButton::Icon::Random };
+    IconButton newButton { "Nuevo", IconButton::Icon::New };
+    IconButton undoButton { "Deshacer (Ctrl+Z)", IconButton::Icon::Undo };
+    IconButton redoButton { "Rehacer (Ctrl+Y)", IconButton::Icon::Redo };
     juce::Label statusLabel;
     GraphView graphView;
     Inspector inspector;

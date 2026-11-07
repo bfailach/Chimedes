@@ -19,7 +19,7 @@ Siguiente: fase 2 (guardar y abrir proyectos) y lo que queda del modo algoritmo.
 
 ## Uso
 
-La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío. El lienzo ocupa toda la ventana, con el panel de propiedades flotando a la derecha y el transporte en la barra inferior.
+La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de hoja) empieza uno vacío. El lienzo ocupa toda la ventana, con el panel de propiedades flotando a la derecha y el transporte en la barra inferior.
 
 | Acción | Cómo |
 | --- | --- |
@@ -31,11 +31,11 @@ La aplicación abre con un grafo de demostración; **Nuevo** empieza uno vacío.
 | Inicio y fin | Clic derecho en un nodo, o los botones del panel derecho |
 | Notas del nodo | Teclado del panel derecho: clic elige una nota, Mayús+clic forma acordes; `<` `>` cambian de octava |
 | Instrumento | Panel derecho: uno para la pista y, si quieres, otro para cada nodo |
-| Grafo al azar | Botón **Aleatorio** (se puede deshacer) |
+| Grafo al azar | Botón **Aleatorio** (icono de dado; se puede deshacer) |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
 | Reproducir / pausa | Barra espaciadora |
-| Deshacer / rehacer | Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
+| Deshacer / rehacer | Iconos de flecha de la barra inferior, Ctrl+Z / Ctrl+Y o Ctrl+Mayús+Z |
 
 Los dos primeros nodos de una pista vacía se marcan solos como inicio y fin. Anillos de los nodos: verde = inicio, violeta = fin, naranja = inalcanzable. Los nombres de las notas aparecen tenues junto a cada nodo y se aclaran al pasar el ratón o al seleccionarlo; la regla de tiempo solo se muestra en el modo línea de tiempo. Los nodos inalcanzables desde el inicio se marcan en naranja y la pista no suena hasta corregirlo.
 
@@ -57,7 +57,7 @@ Seis instrumentos sintetizados, sin archivos de audio: órgano, piano eléctrico
 
 ## Aleatorio
 
-Genera un grafo nuevo al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
+Genera un grafo nuevo al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas caen sobre una rejilla de pulsos o medios pulsos y la última termina justo al acabar el ciclo, así que el ciclo dura un número entero de pulsos y la música sigue al BPM. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
 
 ## Compilar
 
