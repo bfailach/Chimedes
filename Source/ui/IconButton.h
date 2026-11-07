@@ -13,7 +13,7 @@ namespace chimedes::ui
 class IconButton : public juce::Button
 {
 public:
-    enum class Icon { Random, New, Open, Save, Undo, Redo };
+    enum class Icon { Random, New, Open, Save, Undo, Redo, Add };
 
     IconButton (const juce::String& name, Icon iconToUse)
         : juce::Button (name), icon (iconToUse)
@@ -80,6 +80,17 @@ public:
                 plus.lineTo (x + 9.5f, y + 13.5f);
                 plus.startNewSubPath (x + 7.0f, y + 11.0f);
                 plus.lineTo (x + 12.0f, y + 11.0f);
+                g.strokePath (plus, stroke);
+                break;
+            }
+
+            case Icon::Add:
+            {
+                juce::Path plus;
+                plus.startNewSubPath (x + 9.0f, y + 3.5f);
+                plus.lineTo (x + 9.0f, y + 14.5f);
+                plus.startNewSubPath (x + 3.5f, y + 9.0f);
+                plus.lineTo (x + 14.5f, y + 9.0f);
                 g.strokePath (plus, stroke);
                 break;
             }

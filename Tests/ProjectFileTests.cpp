@@ -116,3 +116,26 @@ TEST ("proyecto: un archivo sin pistas abre con una pista vacía")
     CHECK (loaded.project.tracks.size() == 1);
     CHECK (loaded.project.tracks[0].nodes.empty());
 }
+
+TEST ("proyecto: varias pistas se guardan y abren en orden, con nombre y silencio")
+{
+    model::Project p;
+    p.bpm = 140.0;
+
+    for (std::uint32_t i = 1; i <= 4; ++i)
+    {
+        model::Track t;
+        t.id = i * 10;
+        t.name = "Pista " + std::to_string (i);
+        t.instrument = i;
+        t.muted = i == 3;
+        model::randomizeGraph (t, i);
+        p.tracks.push_back (t);
+    }
+
+    const auto loaded = model::projectFromJson (model::projectToJson (p));
+    CHECK (loaded.ok);
+    CHECK (loaded.project.tracks.size() == 4);
+    CHECK (loaded.project.tracks == p.tracks);
+    CHECK (loaded.project.tracks[2].muted);
+}

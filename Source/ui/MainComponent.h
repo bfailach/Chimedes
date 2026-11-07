@@ -12,6 +12,7 @@
 #include "ui/GraphView.h"
 #include "ui/IconButton.h"
 #include "ui/Inspector.h"
+#include "ui/TrackList.h"
 #include "ui/TransportButton.h"
 
 namespace chimedes::ui
@@ -44,20 +45,31 @@ public:
     void openFile (const juce::File& file);
 
 private:
-    class TrackChange;
+    class ProjectChange;
 
     void timerCallback() override;
     void changeListenerCallback (juce::ChangeBroadcaster*) override;  // el historial cambió
 
-    // Cambios a la pista
+    // Cambios a la pista activa (lienzo y panel derecho), con deshacer.
     void applyEdit (const EditCallbacks::Change& change);
     void beginGesture();
     void updateGesture (const EditCallbacks::Change& change);
     void endGesture();
-    void setTrack (const model::Track& newTrack);  // usado por deshacer y rehacer
-    void trackChanged();
 
-    void rebuildSchedule();
+    // Cambios al proyecto (pistas nuevas, borradas, silenciadas...), con deshacer.
+    void applyProjectEdit (const std::function<void (model::Project&)>& change, std::optional<std::size_t> newActive = {});
+    void setProject (const model::Project& newProject, std::size_t newActive);  // deshacer, rehacer, abrir
+    void setActiveTrack (std::size_t index);
+    void projectChanged();
+
+    model::Track& activeTrack() noexcept             { return project.tracks[active]; }
+    const model::Track& activeTrack() const noexcept { return project.tracks[active]; }
+
+    void addTrack();
+    void duplicateTrack (std::size_t index);
+    void deleteTrack (std::size_t index);
+
+    void rebuildSchedules();
     void togglePlayPause();
     void updateUndoButtons();
 
@@ -81,15 +93,16 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioSourcePlayer audioPlayer;
 
-    // Datos
-    model::Track track;
-    std::shared_ptr<const engine::Schedule> schedule;
+    // Datos: el proyecto con todas sus pistas; `active` es la que se edita.
+    model::Project project;
+    std::size_t active = 0;
+    std::vector<std::shared_ptr<const engine::Schedule>> schedules;   // uno por pista
     juce::UndoManager undoManager;
-    std::optional<model::Track> gestureStart;
+    std::optional<model::Project> gestureStart;
 
     // Archivo abierto (vacío = sin título) y lo último guardado, para saber si hay cambios.
     juce::File currentFile;
-    model::Track savedTrack;
+    model::Project savedProject;
     double savedBpm = 120.0;
     std::unique_ptr<juce::FileChooser> fileChooser;
 
@@ -126,10 +139,12 @@ private:
     juce::Label projectLabel;
     GraphView graphView;
     Inspector inspector;
+    TrackList trackList;
     juce::TooltipWindow tooltips { this, 600 };
 
     juce::String audioWarning;
     int timerTicks = 0;
+    bool initialFitDone = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

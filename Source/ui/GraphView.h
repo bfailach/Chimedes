@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -17,7 +18,11 @@ namespace chimedes::ui
 // tamaño sigue a la intensidad. Al reproducir, una chispa recorre la arista hacia la
 // nota siguiente y la estrella destella en el color de su nota (ver theme::pitchColour),
 // con ondas de colores vecinos; lo recorrido queda como un rastro pastel hasta que
-// empieza el ciclo siguiente. También es el editor:
+// empieza el ciclo siguiente.
+//
+// Con varias pistas, todas se dibujan y se animan a la vez; la pista activa se ve
+// entera y es la única que se edita, las demás quedan atenuadas (un clic en una de
+// sus estrellas la vuelve activa). También es el editor:
 //
 //   doble clic en vacío ........ crear nodo
 //   arrastrar el centro ........ mover nodo
@@ -34,14 +39,24 @@ public:
 
     GraphView();
 
-    void setTrack (const model::Track* newTrack);
-    void setSchedule (std::shared_ptr<const engine::Schedule> newSchedule);
-    void setUnreachable (std::vector<model::NodeId> nodes);
-    // `bpm` permite interpolar la posición entre llamadas para animar a 60 fps.
-    void setPlayhead (double beatInCycle, bool isPlaying, double bpm);
+    // Una pista para dibujar. Los punteros deben seguir vivos hasta la próxima
+    // llamada a setTracks (la ventana la repite tras cada cambio).
+    struct TrackView
+    {
+        const model::Track* track = nullptr;
+        std::shared_ptr<const engine::Schedule> schedule;   // nullptr = no suena
+        std::vector<model::NodeId> unreachable;
+    };
+
+    void setTracks (std::vector<TrackView> tracks, std::size_t activeIndex);
+
+    // Posición global en pulsos desde que empezó la reproducción; cada pista la
+    // convierte a su propio ciclo. `bpm` permite interpolar para animar a 60 fps.
+    void setPlayhead (double positionBeats, bool isPlaying, double bpm);
 
     EditCallbacks callbacks;
     std::function<void (model::NodeId)> onSelectionChanged;
+    std::function<void (std::size_t trackIndex)> onActivateTrack;   // clic en otra pista
 
     // Ajusta zoom y desplazamiento para que todo el grafo quepa en `visibleArea`
     // (en coordenadas de este componente), sin acercar más allá del 100 %.
@@ -78,37 +93,7 @@ private:
     void showNodeMenu (model::NodeId node);
     void setSelection (model::NodeId node, model::EdgeId edge);
 
-    // Animación de reproducción: se llama en cada refresco de pantalla.
-    void onFrame();
-    void detectOnsets (double fromBeat, double toBeat, double nowMs);
-    void startNewCycle (double nowMs);
-    bool isAnimating (double nowMs) const noexcept;
-
-    float starRadius (const model::Node& node) const noexcept;
-
-    void paintSky (juce::Graphics& g) const;
-    void paintAtlasGrid (juce::Graphics& g) const;
-    void paintLitEdges (juce::Graphics& g, double nowMs) const;
-    void paintSparks (juce::Graphics& g) const;
-    void paintRuler (juce::Graphics& g) const;
-    void paintEdges (juce::Graphics& g) const;
-    void paintNodes (juce::Graphics& g, double nowMs) const;
-    void paintPlayhead (juce::Graphics& g) const;
-    void paintConnectionPreview (juce::Graphics& g) const;
-    void paintEmptyHint (juce::Graphics& g) const;
-
-    bool isSounding (model::NodeId node) const noexcept;
-    bool isUnreachable (model::NodeId node) const noexcept;
-
-    const model::Track* track = nullptr;
-    std::shared_ptr<const engine::Schedule> schedule;
-    std::vector<model::NodeId> unreachable;
-    double playheadBeat = 0.0;
-    double playheadMs = 0.0;        // cuándo llegó `playheadBeat`
-    double currentBpm = 120.0;
-    bool playing = false;
-
-    // Estado de la animación. `animBeat` es la posición interpolada que se dibuja.
+    // Estado de la animación de una nota que sonó.
     struct Onset
     {
         double ms = 0.0;                    // cuándo empezó a sonar
@@ -116,10 +101,54 @@ private:
         model::NodeId from = model::noNode;
     };
 
-    double animBeat = 0.0;
-    std::unordered_map<model::NodeId, Onset> onsets;          // ciclo actual
-    std::unordered_map<model::NodeId, Onset> previousOnsets;  // rastro que se apaga
-    double cycleStartMs = -1.0e9;
+    // Una pista en el lienzo, con su propia animación (cada pista tiene su ciclo).
+    struct Layer
+    {
+        model::TrackId id = 0;
+        const model::Track* track = nullptr;
+        std::shared_ptr<const engine::Schedule> schedule;
+        std::vector<model::NodeId> unreachable;
+
+        double animBeat = 0.0;                                     // posición en su ciclo
+        std::unordered_map<model::NodeId, Onset> onsets;           // ciclo actual
+        std::unordered_map<model::NodeId, Onset> previousOnsets;   // rastro que se apaga
+        double cycleStartMs = -1.0e9;
+    };
+
+    // Animación de reproducción: se llama en cada refresco de pantalla.
+    void onFrame();
+    void detectOnsets (Layer& layer, double fromBeat, double toBeat, double nowMs);
+    void startNewCycle (Layer& layer, double nowMs);
+    bool isAnimating (double nowMs) const noexcept;
+
+    float starRadius (const model::Node& node) const noexcept;
+    const Layer* activeLayer() const noexcept;
+    std::optional<std::size_t> backgroundTrackAt (juce::Point<float> screen) const;
+
+    void paintSky (juce::Graphics& g) const;
+    void paintAtlasGrid (juce::Graphics& g) const;
+    void paintRuler (juce::Graphics& g) const;
+    void paintLayer (juce::Graphics& g, const Layer& layer, bool isActive, double nowMs) const;
+    void paintEdges (juce::Graphics& g, const Layer& layer, bool isActive) const;
+    void paintLitEdges (juce::Graphics& g, const Layer& layer, double nowMs) const;
+    void paintSparks (juce::Graphics& g, const Layer& layer) const;
+    void paintNodes (juce::Graphics& g, const Layer& layer, bool isActive, double nowMs) const;
+    void paintPlayhead (juce::Graphics& g) const;
+    void paintConnectionPreview (juce::Graphics& g) const;
+    void paintEmptyHint (juce::Graphics& g) const;
+
+    static bool isSounding (const Layer& layer, model::NodeId node) noexcept;
+    static bool isUnreachable (const Layer& layer, model::NodeId node) noexcept;
+
+    std::vector<Layer> layers;
+    std::size_t active = 0;
+    const model::Track* track = nullptr;   // la pista activa (la que se edita)
+
+    double playheadBeat = 0.0;      // posición global
+    double playheadMs = 0.0;        // cuándo llegó `playheadBeat`
+    double currentBpm = 120.0;
+    bool playing = false;
+
     juce::VBlankAttachment vblank { this, [this] { onFrame(); } };
 
     juce::Point<double> viewOrigin { -80.0, -60.0 };

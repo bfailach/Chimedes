@@ -4,6 +4,7 @@
 
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
+#include "model/Instruments.h"
 #include "model/ProjectFile.h"
 #include "model/Randomizer.h"
 #include "ui/Text.h"
@@ -46,23 +47,58 @@ namespace
     }
 }
 
-// Una entrada de deshacer: la pista antes y después del cambio.
-class MainComponent::TrackChange : public juce::UndoableAction
+// Una entrada de deshacer: el proyecto antes y después del cambio, y qué pista
+// estaba activa en cada momento (deshacer vuelve a mostrar la pista afectada).
+class MainComponent::ProjectChange : public juce::UndoableAction
 {
 public:
-    TrackChange (MainComponent& ownerToUse, model::Track beforeChange, model::Track afterChange)
-        : owner (ownerToUse), before (std::move (beforeChange)), after (std::move (afterChange)) {}
+    ProjectChange (MainComponent& ownerToUse, model::Project beforeChange, std::size_t activeBefore,
+                   model::Project afterChange, std::size_t activeAfter)
+        : owner (ownerToUse), before (std::move (beforeChange)), after (std::move (afterChange)),
+          beforeActive (activeBefore), afterActive (activeAfter) {}
 
-    bool perform() override { owner.setTrack (after); return true; }
-    bool undo() override    { owner.setTrack (before); return true; }
+    bool perform() override { owner.setProject (after, afterActive); return true; }
+    bool undo() override    { owner.setProject (before, beforeActive); return true; }
 
 private:
     MainComponent& owner;
-    model::Track before, after;
+    model::Project before, after;
+    std::size_t beforeActive, afterActive;
 };
 
+namespace
+{
+    model::Project makeDemoProject()
+    {
+        model::Project p;
+        auto demo = model::makeDemoTrack();
+        demo.name = "Pista 1";
+        p.tracks = { demo };
+        return p;
+    }
+
+    model::TrackId nextTrackId (const model::Project& p)
+    {
+        model::TrackId id = 1;
+        for (const auto& t : p.tracks)
+            id = std::max (id, t.id + 1);
+        return id;
+    }
+
+    // Nombre libre del estilo "Pista 3".
+    std::string nextTrackName (const model::Project& p)
+    {
+        for (int n = static_cast<int> (p.tracks.size()) + 1;; ++n)
+        {
+            const auto name = "Pista " + std::to_string (n);
+            if (std::none_of (p.tracks.begin(), p.tracks.end(), [&name] (const model::Track& t) { return t.name == name; }))
+                return name;
+        }
+    }
+}
+
 MainComponent::MainComponent()
-    : track (model::makeDemoTrack())
+    : project (makeDemoProject())
 {
     // --- Transporte --------------------------------------------------------
     playButton.onClick = [this] { engine.play(); };
@@ -110,7 +146,22 @@ MainComponent::MainComponent()
 
     graphView.callbacks = editCallbacks;
     inspector.callbacks = editCallbacks;
-    graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (track, node); };
+    graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (activeTrack(), node); };
+    graphView.onActivateTrack = [this] (std::size_t index) { setActiveTrack (index); };
+
+    // --- Pistas ------------------------------------------------------------
+    trackList.onSelect = [this] (std::size_t i) { setActiveTrack (i); };
+    trackList.onAdd = [this] { addTrack(); };
+    trackList.onDuplicate = [this] (std::size_t i) { duplicateTrack (i); };
+    trackList.onDelete = [this] (std::size_t i) { deleteTrack (i); };
+    trackList.onToggleMute = [this] (std::size_t i)
+    {
+        applyProjectEdit ([i] (model::Project& p) { p.tracks[i].muted = ! p.tracks[i].muted; });
+    };
+    trackList.onRename = [this] (std::size_t i, juce::String name)
+    {
+        applyProjectEdit ([i, n = name.toStdString()] (model::Project& p) { p.tracks[i].name = n; });
+    };
 
     // Notas de prueba del teclado del panel: suenan al momento, aunque no se reproduzca.
     inspector.onAudition = [this] (int pitch, int velocity, int instrument)
@@ -120,11 +171,11 @@ MainComponent::MainComponent()
         else
             engine.previewNoteOff (pitch, instrument);
     };
-    graphView.setTrack (&track);
 
     // El lienzo ocupa toda la ventana; los paneles flotan encima.
     addAndMakeVisible (graphView);
     addAndMakeVisible (inspector);
+    addAndMakeVisible (trackList);
     addAndMakeVisible (topBar);
     addAndMakeVisible (bottomBar);
 
@@ -154,7 +205,7 @@ MainComponent::MainComponent()
         audioWarning = text ("No se encontró ningún dispositivo de salida de audio");
 
     undoManager.addChangeListener (this);
-    trackChanged();
+    projectChanged();
     updateUndoButtons();
     markSaved();   // el grafo de demostración no cuenta como cambio sin guardar
 
@@ -177,28 +228,41 @@ MainComponent::~MainComponent()
 
 void MainComponent::applyEdit (const EditCallbacks::Change& change)
 {
-    auto after = track;
-    change (after);
+    auto after = project;
+    change (after.tracks[active]);
 
-    if (after == track)
+    if (after == project)
         return;
 
     undoManager.beginNewTransaction();
-    undoManager.perform (new TrackChange (*this, track, std::move (after)));
+    undoManager.perform (new ProjectChange (*this, project, active, std::move (after), active));
+}
+
+void MainComponent::applyProjectEdit (const std::function<void (model::Project&)>& change, std::optional<std::size_t> newActive)
+{
+    auto after = project;
+    change (after);
+
+    const auto afterActive = std::min (newActive.value_or (active), after.tracks.size() - 1);
+    if (after == project && afterActive == active)
+        return;
+
+    undoManager.beginNewTransaction();
+    undoManager.perform (new ProjectChange (*this, project, active, std::move (after), afterActive));
 }
 
 void MainComponent::beginGesture()
 {
-    gestureStart = track;
+    gestureStart = project;
 }
 
 void MainComponent::updateGesture (const EditCallbacks::Change& change)
 {
     if (! gestureStart.has_value())
-        gestureStart = track;
+        gestureStart = project;
 
-    change (track);
-    trackChanged();
+    change (activeTrack());
+    projectChanged();
 }
 
 void MainComponent::endGesture()
@@ -209,26 +273,97 @@ void MainComponent::endGesture()
     auto before = std::move (*gestureStart);
     gestureStart.reset();
 
-    if (before == track)
+    if (before == project)
         return;
 
     // El cambio ya está aplicado; la acción solo lo registra para deshacer.
     undoManager.beginNewTransaction();
-    undoManager.perform (new TrackChange (*this, std::move (before), track));
+    undoManager.perform (new ProjectChange (*this, std::move (before), active, project, active));
 }
 
-void MainComponent::setTrack (const model::Track& newTrack)
+void MainComponent::setProject (const model::Project& newProject, std::size_t newActive)
 {
-    track = newTrack;
-    trackChanged();
+    const auto trackChanged = newActive != active
+                           || newActive >= project.tracks.size()
+                           || newActive >= newProject.tracks.size()
+                           || project.tracks[newActive].id != newProject.tracks[newActive].id;
+
+    project = newProject;
+    if (project.tracks.empty())
+        project.tracks.push_back ({});
+    active = std::min (newActive, project.tracks.size() - 1);
+
+    // Otra pista: la selección del lienzo era de la anterior.
+    if (trackChanged)
+        graphView.selectNode (model::noNode);
+
+    projectChanged();
 }
 
-void MainComponent::trackChanged()
+void MainComponent::setActiveTrack (std::size_t index)
 {
-    rebuildSchedule();
-    inspector.refresh (track, graphView.getSelectedNode());
+    if (index >= project.tracks.size() || index == active)
+        return;
+
+    // Cambiar de pista no es una edición: no entra en el historial.
+    graphView.selectNode (model::noNode);
+    active = index;
+    projectChanged();
+}
+
+void MainComponent::projectChanged()
+{
+    rebuildSchedules();
+    inspector.refresh (activeTrack(), graphView.getSelectedNode());
+    trackList.refresh (project, active);
     graphView.repaint();
     updateTitle();
+    resized();   // la lista de pistas cambia de alto
+}
+
+void MainComponent::addTrack()
+{
+    if (project.tracks.size() >= TrackList::maxTracks)
+        return;
+
+    model::Track t;
+    t.id = nextTrackId (project);
+    t.name = nextTrackName (project);
+    // Cada pista nueva con otro instrumento, para distinguirlas al oído.
+    t.instrument = static_cast<model::InstrumentId> (static_cast<int> (project.tracks.size()) % model::instruments::count + 1);
+    t.mode = activeTrack().mode;
+    t.directed = activeTrack().directed;
+
+    const auto index = project.tracks.size();
+    applyProjectEdit ([t] (model::Project& p) { p.tracks.push_back (t); }, index);
+}
+
+void MainComponent::duplicateTrack (std::size_t index)
+{
+    if (project.tracks.size() >= TrackList::maxTracks || index >= project.tracks.size())
+        return;
+
+    auto copy = project.tracks[index];
+    copy.id = nextTrackId (project);
+    copy.name = (copy.name.empty() ? std::string ("Pista") : copy.name) + " (copia)";
+
+    applyProjectEdit ([index, copy] (model::Project& p)
+    {
+        p.tracks.insert (p.tracks.begin() + static_cast<std::ptrdiff_t> (index) + 1, copy);
+    }, index + 1);
+}
+
+void MainComponent::deleteTrack (std::size_t index)
+{
+    if (project.tracks.size() <= 1 || index >= project.tracks.size())
+        return;
+
+    // Se puede deshacer, así que no hace falta preguntar.
+    const auto newActive = index < active ? active - 1 : std::min (active, project.tracks.size() - 2);
+    applyProjectEdit ([index] (model::Project& p)
+    {
+        p.tracks.erase (p.tracks.begin() + static_cast<std::ptrdiff_t> (index));
+    }, newActive);
 }
 
 void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -236,17 +371,37 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     updateUndoButtons();
 }
 
-void MainComponent::rebuildSchedule()
+void MainComponent::rebuildSchedules()
 {
-    const auto result = engine::buildSchedule (track);
+    // Cada pista suena en su propia ranura del motor, con su propio ciclo.
+    schedules.assign (project.tracks.size(), nullptr);
+    std::vector<GraphView::TrackView> views;
+    juce::String problem;
 
-    schedule = result.ok() ? std::make_shared<const engine::Schedule> (*result.schedule) : nullptr;
-    engine.publishSchedule (0, schedule);
+    for (std::size_t i = 0; i < project.tracks.size(); ++i)
+    {
+        const auto& t = project.tracks[i];
+        const auto result = engine::buildSchedule (t);
 
-    graphView.setSchedule (schedule);
-    graphView.setUnreachable (result.validation.unreachable);
+        if (result.ok())
+            schedules[i] = std::make_shared<const engine::Schedule> (*result.schedule);
 
-    const auto problem = track.nodes.empty() ? juce::String() : describe (result);
+        engine.publishSchedule (static_cast<int> (i), t.muted ? nullptr : schedules[i]);
+        views.push_back ({ &t, t.muted ? nullptr : schedules[i], result.validation.unreachable });
+
+        // Avisos: los de la pista activa primero; si no hay, el de otra pista (con su nombre).
+        const auto issue = t.nodes.empty() || t.muted ? juce::String() : describe (result);
+        if (issue.isNotEmpty() && (i == active || problem.isEmpty()))
+            problem = i == active ? issue
+                                  : juce::String::fromUTF8 (t.name.c_str()) + ": " + issue.substring (0, 1).toLowerCase() + issue.substring (1);
+    }
+
+    // Las ranuras que sobran (pistas borradas) se silencian.
+    for (auto i = static_cast<int> (project.tracks.size()); i < audio::AudioEngine::maxTracks; ++i)
+        engine.publishSchedule (i, nullptr);
+
+    graphView.setTracks (std::move (views), active);
+
     const auto status = problem.isNotEmpty() ? problem : audioWarning;
     if (status != statusLabel.getText())
     {
@@ -279,11 +434,7 @@ void MainComponent::timerCallback()
     if (! juce::Process::isForegroundProcess())
         inspector.releasePianoKeys();
 
-    const auto position = engine.getPositionBeats();
-    const auto cycle = schedule != nullptr ? schedule->cycleLengthBeats : 0.0;
-    const auto beatInCycle = cycle > 0.0 ? std::fmod (position, cycle) : 0.0;
-
-    graphView.setPlayhead (beatInCycle, engine.isPlaying(), engine.getBpm());
+    graphView.setPlayhead (engine.getPositionBeats(), engine.isPlaying(), engine.getBpm());
     playButton.setToggleState (engine.isPlaying(), juce::dontSendNotification);
 
     // Libera los horarios viejos unas dos veces por segundo.
@@ -426,6 +577,21 @@ void MainComponent::resized()
         area.removeFromBottom (30);
     }
 
+    // Lista de pistas arriba a la izquierda, alineada con la barra superior.
+    {
+        constexpr int listWidth = 230;
+        const auto top = topBarY;
+        const auto listHeight = std::min (trackList.getIdealHeight(), area.getBottom() - 6 - top);
+        trackList.setBounds (area.getX(), top, listWidth, listHeight);
+    }
+
+    // La primera vez, el grafo se encuadra en el espacio que dejan libre los paneles.
+    if (! initialFitDone && getWidth() > 0 && getHeight() > 0)
+    {
+        initialFitDone = true;
+        graphView.zoomToFit (freeCanvasArea());
+    }
+
     // Panel derecho flotante, centrado en vertical respecto a la ventana, sin pisar la barra.
     area.removeFromBottom (6);
     const auto panelHeight = std::min (inspector.getIdealHeight(), area.getHeight());
@@ -440,12 +606,12 @@ void MainComponent::resized()
 
 bool MainComponent::hasUnsavedChanges() const
 {
-    return track != savedTrack || std::abs (engine.getBpm() - savedBpm) > 1e-9;
+    return project != savedProject || std::abs (engine.getBpm() - savedBpm) > 1e-9;
 }
 
 void MainComponent::markSaved()
 {
-    savedTrack = track;
+    savedProject = project;
     savedBpm = engine.getBpm();
     updateTitle();
 }
@@ -481,6 +647,7 @@ juce::Rectangle<int> MainComponent::freeCanvasArea() const
     return getLocalBounds().reduced (margin)
                .withTrimmedTop (topBarY + topBarHeight + 8 - margin)
                .withTrimmedRight (inspectorWidth + 16)
+               .withTrimmedLeft (230 + 16)
                .withTrimmedBottom (barHeight + 16);
 }
 
@@ -533,20 +700,25 @@ void MainComponent::newProject()
 {
     confirmDiscardChanges ([this]
     {
-        // Documento nuevo y vacío, con las mismas opciones de pista.
+        // Documento nuevo: una sola pista vacía, con las opciones de la pista activa.
         engine.stop();
         graphView.selectNode (model::noNode);
 
-        auto empty = track;
+        auto empty = activeTrack();
+        empty.id = 1;
+        empty.name = "Pista 1";
         empty.nodes.clear();
         empty.edges.clear();
         empty.startNode = model::noNode;
         empty.endNode = model::noNode;
-        empty.name.clear();
+        empty.muted = false;
+
+        model::Project fresh;
+        fresh.tracks = { empty };
 
         undoManager.clearUndoHistory();
         currentFile = juce::File();
-        setTrack (empty);
+        setProject (fresh, 0);
         markSaved();
     });
 }
@@ -597,10 +769,9 @@ void MainComponent::openFile (const juce::File& file)
     graphView.selectNode (model::noNode);
     undoManager.clearUndoHistory();
 
-    // Por ahora la app edita una sola pista: se abre la primera.
     currentFile = file;
     bpmSlider.setValue (loaded.project.bpm, juce::sendNotificationSync);
-    setTrack (loaded.project.tracks.front());
+    setProject (loaded.project, 0);
     markSaved();
 
     graphView.zoomToFit (freeCanvasArea());
@@ -655,14 +826,13 @@ void MainComponent::saveProjectAs (std::function<void (bool)> done)
 
 bool MainComponent::writeFile (const juce::File& file)
 {
-    model::Project project;
-    project.bpm = engine.getBpm();
-    project.tracks = { track };
+    auto toSave = project;
+    toSave.bpm = engine.getBpm();
 
     // Se escribe en un temporal y luego se reemplaza: si algo falla, el archivo
     // anterior queda intacto.
     juce::TemporaryFile temp (file);
-    const auto json = juce::String::fromUTF8 (model::projectToJson (project).c_str());
+    const auto json = juce::String::fromUTF8 (model::projectToJson (toSave).c_str());
     const auto ok = temp.getFile().replaceWithText (json, false, false, "\n") && temp.overwriteTargetFileWithTemporary();
 
     if (! ok)

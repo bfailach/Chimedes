@@ -20,7 +20,13 @@ Fase 2 completa:
 - [x] Modo algoritmo: árboles, recorridos, hermanos en secuencia o a la vez y ajuste al pulso
 - [x] Guardar y abrir proyectos (`.chimedes`)
 
-Siguiente: fase 3 (varias pistas a la vez, muestras de sonido propias) y fase 4 (aleatorizar todos los parámetros, exportar a WAV y MIDI).
+Fase 3, en curso:
+
+- [x] Varias pistas que suenan a la vez, cada una con su ciclo
+- [x] Edición en vivo mientras suena
+- [ ] Muestras de sonido propias como instrumentos
+
+Después: fase 4 (aleatorizar todos los parámetros, exportar a WAV y MIDI).
 
 ## Uso
 
@@ -39,6 +45,7 @@ La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de
 | Probar notas | Clic en el teclado del panel o letras **A W S E D F T G Y H U J K O L P** (de do a re♯ de la octava siguiente, desde el primer do visible). Suenan al momento. Varias letras a la vez o Mayús forman un acorde; **Z / X** cambian de octava |
 | Guardar la nota o el acorde | **Enter** (Esc descarta la propuesta) |
 | Nuevo, abrir, guardar | Iconos de hoja, carpeta y disquete de la barra superior (junto al nombre del proyecto), o **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Mayús+S**: guardar como). Antes de cerrar, abrir otro o empezar uno nuevo, si hay cambios sin guardar, la app pregunta |
+| Pistas | Panel izquierdo: clic activa una pista (la que se edita; las demás se ven atenuadas y siguen sonando), doble clic la renombra, el altavoz la silencia, **+** agrega una (hasta 16) y el clic derecho duplica o elimina. Un clic en una estrella atenuada también activa su pista. Todo se puede deshacer |
 | Grafo al azar | Botón **Aleatorio** (icono de dado; se puede deshacer) |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
@@ -58,6 +65,10 @@ El lienzo se dibuja como un mapa de estrellas sobre negro suave (tema *Starlight
 Los colores siguen la rueda cromática por clase de nota: do rojo, re naranja, mi verde, sol azul, la violeta, si magenta. Un do es del mismo color en cualquier octava, y las teclas seleccionadas en el teclado del panel usan el mismo color. El resto de la interfaz es casi monocroma, con blanco estelar como único acento.
 
 Tipografías: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) para la interfaz y [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) para las cifras, ambas con licencia SIL Open Font License (ver `Resources/Fonts`). Van incluidas en el ejecutable.
+
+## Varias pistas
+
+Cada pista es un grafo independiente con sus propias opciones (modo, árbol, recorrido, instrumento) y su propio ciclo: una pista de 3 pulsos contra otra de 4 da una polirritmia que se repite cada 12. Todas comparten el BPM y el lienzo; la activa se dibuja entera y las demás atenuadas, con sus destellos al sonar. Las pistas nuevas toman otro instrumento para distinguirlas al oído.
 
 ## Proyectos
 

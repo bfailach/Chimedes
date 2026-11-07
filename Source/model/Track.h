@@ -80,6 +80,8 @@ struct Project
     int formatVersion = 1;
     double bpm = 120.0;
     std::vector<Track> tracks;
+
+    bool operator== (const Project&) const = default;
 };
 
 } // namespace chimedes::model

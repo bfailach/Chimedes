@@ -72,35 +72,54 @@ GraphView::GraphView()
 // Datos
 // ---------------------------------------------------------------------------
 
-void GraphView::setTrack (const model::Track* newTrack)
+void GraphView::setTracks (std::vector<TrackView> tracks, std::size_t activeIndex)
 {
-    track = newTrack;
+    // Conserva la animación de cada pista (por su id) aunque cambie su contenido.
+    std::vector<Layer> next;
+    next.reserve (tracks.size());
+
+    for (auto& view : tracks)
+    {
+        Layer layer;
+        if (view.track != nullptr)
+        {
+            const auto previous = std::find_if (layers.begin(), layers.end(),
+                                                [&view] (const Layer& l) { return l.id == view.track->id; });
+            if (previous != layers.end())
+                layer = std::move (*previous);
+            layer.id = view.track->id;
+        }
+
+        layer.track = view.track;
+        layer.schedule = std::move (view.schedule);
+        layer.unreachable = std::move (view.unreachable);
+        next.push_back (std::move (layer));
+    }
+
+    layers = std::move (next);
+    active = layers.empty() ? 0 : std::min (activeIndex, layers.size() - 1);
+    track = layers.empty() ? nullptr : layers[active].track;
     repaint();
 }
 
-void GraphView::setSchedule (std::shared_ptr<const engine::Schedule> newSchedule)
+const GraphView::Layer* GraphView::activeLayer() const noexcept
 {
-    schedule = std::move (newSchedule);
-    repaint();
+    return active < layers.size() ? &layers[active] : nullptr;
 }
 
-void GraphView::setUnreachable (std::vector<model::NodeId> nodes)
+void GraphView::setPlayhead (double positionBeats, bool isPlaying, double bpm)
 {
-    unreachable = std::move (nodes);
-    repaint();
-}
-
-void GraphView::setPlayhead (double beatInCycle, bool isPlaying, double bpm)
-{
-    // Al arrancar, la nota en la posición actual también debe destellar.
+    // Al arrancar, la nota en la posición actual también debe destellar
     // (el audio puede ir ya un poco adelante cuando llega la primera posición).
     if (isPlaying && ! playing)
-        animBeat = std::min (animBeat, beatInCycle) - 1.0e-6;
+        for (auto& layer : layers)
+            if (layer.schedule != nullptr && layer.schedule->cycleLengthBeats > 0.0)
+                layer.animBeat = std::min (layer.animBeat, std::fmod (positionBeats, layer.schedule->cycleLengthBeats)) - 1.0e-6;
 
-    if (std::abs (beatInCycle - playheadBeat) > 1e-9 || isPlaying != playing)
+    if (std::abs (positionBeats - playheadBeat) > 1e-9 || isPlaying != playing)
         playheadMs = nowMs();
 
-    playheadBeat = beatInCycle;
+    playheadBeat = positionBeats;
     playing = isPlaying;
     currentBpm = bpm;
 }
@@ -112,74 +131,78 @@ void GraphView::setPlayhead (double beatInCycle, bool isPlaying, double bpm)
 void GraphView::onFrame()
 {
     const auto now = nowMs();
-    const auto cycle = schedule != nullptr ? schedule->cycleLengthBeats : 0.0;
 
-    if (playing && cycle > 0.0)
+    // La posición llega a ~30 Hz desde el audio; entre medias se interpola con el
+    // tempo, sin adelantarse más de dos llamadas (si el audio se detiene, se para).
+    auto position = playheadBeat;
+    if (playing)
+        position += std::min (now - playheadMs, 70.0) / 60000.0 * currentBpm;
+
+    for (auto& layer : layers)
     {
-        // La posición llega a ~30 Hz desde el audio; entre medias se interpola con el
-        // tempo, sin adelantarse más de dos llamadas (si el audio se detiene, se para).
-        const auto elapsed = std::min (now - playheadMs, 70.0) / 60000.0 * currentBpm;
-        auto target = playheadBeat + std::max (0.0, elapsed);
-        if (target >= cycle)
-            target -= cycle;
+        const auto cycle = layer.schedule != nullptr ? layer.schedule->cycleLengthBeats : 0.0;
 
-        if (target + cycle * 0.5 < animBeat)   // dio la vuelta: ciclo nuevo
+        if (playing && cycle > 0.0)
         {
-            detectOnsets (animBeat, cycle, now);
-            startNewCycle (now);
-            detectOnsets (-1.0e-6, target, now);
-            animBeat = target;
-        }
-        else if (target > animBeat)
-        {
-            detectOnsets (animBeat, target, now);
-            animBeat = target;
-        }
-    }
-    else
-    {
-        // Detenido (posición en 0 tras haber sonado): el rastro se apaga.
-        if (! playing && playheadBeat <= 0.0 && ! onsets.empty())
-            startNewCycle (now);
+            const auto target = std::fmod (position, cycle);
 
-        animBeat = playheadBeat;
+            if (target + cycle * 0.5 < layer.animBeat)   // dio la vuelta: ciclo nuevo
+            {
+                detectOnsets (layer, layer.animBeat, cycle, now);
+                startNewCycle (layer, now);
+                detectOnsets (layer, -1.0e-6, target, now);
+                layer.animBeat = target;
+            }
+            else if (target > layer.animBeat)
+            {
+                detectOnsets (layer, layer.animBeat, target, now);
+                layer.animBeat = target;
+            }
+        }
+        else
+        {
+            // Detenido (posición en 0 tras haber sonado): el rastro se apaga.
+            if (! playing && playheadBeat <= 0.0 && ! layer.onsets.empty())
+                startNewCycle (layer, now);
+
+            layer.animBeat = cycle > 0.0 ? std::fmod (playheadBeat, cycle) : 0.0;
+        }
     }
 
     if (playing || isAnimating (now))
         repaint();
 }
 
-void GraphView::detectOnsets (double fromBeat, double toBeat, double now)
+void GraphView::detectOnsets (Layer& layer, double fromBeat, double toBeat, double now)
 {
-    if (schedule == nullptr)
+    if (layer.schedule == nullptr)
         return;
 
-    for (const auto& e : schedule->events)
+    for (const auto& e : layer.schedule->events)
         if (e.startBeat > fromBeat && e.startBeat <= toBeat)
-            onsets[e.node] = { now, e.pitches, e.from };
+            layer.onsets[e.node] = { now, e.pitches, e.from };
 }
 
-void GraphView::startNewCycle (double now)
+void GraphView::startNewCycle (Layer& layer, double now)
 {
-    previousOnsets = std::move (onsets);
-    onsets.clear();
-    cycleStartMs = now;
+    layer.previousOnsets = std::move (layer.onsets);
+    layer.onsets.clear();
+    layer.cycleStartMs = now;
 }
 
 bool GraphView::isAnimating (double now) const noexcept
 {
-    if (now - cycleStartMs < trailFadeMs && ! previousOnsets.empty())
-        return true;
-
-    return std::any_of (onsets.begin(), onsets.end(), [now] (const auto& entry)
+    return std::any_of (layers.begin(), layers.end(), [now] (const Layer& layer)
     {
-        return now - entry.second.ms < flashMs;
+        if (now - layer.cycleStartMs < trailFadeMs && ! layer.previousOnsets.empty())
+            return true;
+
+        return std::any_of (layer.onsets.begin(), layer.onsets.end(), [now] (const auto& entry)
+        {
+            return now - entry.second.ms < flashMs;
+        });
     });
 }
-
-// ---------------------------------------------------------------------------
-// Selección
-// ---------------------------------------------------------------------------
 
 model::NodeId GraphView::getSelectedNode() const noexcept
 {
@@ -279,6 +302,18 @@ juce::Point<double> GraphView::toModel (juce::Point<float> screen) const noexcep
              viewOrigin.y + (screen.y - static_cast<float> (rulerHeight)) / zoom };
 }
 
+std::optional<std::size_t> GraphView::backgroundTrackAt (juce::Point<float> screen) const
+{
+    // Solo el centro de la estrella (no el anillo): así es difícil activarla sin querer.
+    for (std::size_t i = layers.size(); i-- > 0;)
+        if (i != active && layers[i].track != nullptr)
+            for (const auto& node : layers[i].track->nodes)
+                if (toScreen (node).getDistanceFrom (screen) <= starRadius (node) + 5.0f)
+                    return i;
+
+    return std::nullopt;
+}
+
 const model::Node* GraphView::nodeAt (juce::Point<float> screen) const noexcept
 {
     if (track == nullptr)
@@ -373,6 +408,15 @@ void GraphView::mouseDown (const juce::MouseEvent& e)
             setSelection (model::noNode, edgeId);
             return;
         }
+
+        // Clic en una estrella de otra pista: esa pista pasa a ser la activa.
+        if (! e.mods.isMiddleButtonDown())
+            if (const auto other = backgroundTrackAt (e.position); other.has_value() && onActivateTrack)
+            {
+                setSelection (model::noNode, 0);
+                onActivateTrack (*other);
+                return;
+            }
 
         if (! e.mods.isMiddleButtonDown())
             setSelection (model::noNode, 0);
@@ -538,15 +582,35 @@ void GraphView::paint (juce::Graphics& g)
     if (track == nullptr)
         return;
 
+    // Las otras pistas, atenuadas y debajo: se ven y se animan, pero no se editan.
+    if (layers.size() > 1)
+    {
+        g.beginTransparencyLayer (0.38f);
+        for (std::size_t i = 0; i < layers.size(); ++i)
+            if (i != active && layers[i].track != nullptr)
+                paintLayer (g, layers[i], false, now);
+        g.endTransparencyLayer();
+    }
+
     if (track->nodes.empty())
         paintEmptyHint (g);
 
-    paintEdges (g);
-    paintLitEdges (g, now);
-    paintSparks (g);
-    paintConnectionPreview (g);
-    paintPlayhead (g);
-    paintNodes (g, now);
+    paintLayer (g, layers[active], true, now);
+}
+
+void GraphView::paintLayer (juce::Graphics& g, const Layer& layer, bool isActive, double now) const
+{
+    paintEdges (g, layer, isActive);
+    paintLitEdges (g, layer, now);
+    paintSparks (g, layer);
+
+    if (isActive)
+    {
+        paintConnectionPreview (g);
+        paintPlayhead (g);
+    }
+
+    paintNodes (g, layer, isActive, now);
 }
 
 void GraphView::paintSky (juce::Graphics& g) const
@@ -651,12 +715,12 @@ void GraphView::paintRuler (juce::Graphics& g) const
     }
 }
 
-void GraphView::paintEdges (juce::Graphics& g) const
+void GraphView::paintEdges (juce::Graphics& g, const Layer& layer, bool isActive) const
 {
-    for (const auto& e : track->edges)
+    for (const auto& e : layer.track->edges)
     {
-        const auto* from = track->findNode (e.from);
-        const auto* to = track->findNode (e.to);
+        const auto* from = layer.track->findNode (e.from);
+        const auto* to = layer.track->findNode (e.to);
         if (from == nullptr || to == nullptr)
             continue;
 
@@ -672,29 +736,29 @@ void GraphView::paintEdges (juce::Graphics& g) const
         const auto direction = (b - a) / length;
         const juce::Line<float> line (a + direction * ra, b - direction * rb);
 
-        const bool selected = e.id == selectedEdge;
+        const bool selected = isActive && e.id == selectedEdge;
         g.setColour (selected ? colours::edgeSelected : colours::edge);
         const auto thickness = selected ? 1.8f : 1.0f;
 
-        if (track->directed)
+        if (layer.track->directed)
             g.drawArrow (line, thickness, 7.0f, 7.0f);
         else
             g.drawLine (line, thickness);
     }
 }
 
-void GraphView::paintLitEdges (juce::Graphics& g, double now) const
+void GraphView::paintLitEdges (juce::Graphics& g, const Layer& layer, double now) const
 {
     // Aristas ya recorridas: degradado del color de una nota al de la siguiente.
     auto paintSet = [&] (const std::unordered_map<model::NodeId, Onset>& set, float fade, bool skipRelit)
     {
         for (const auto& [id, onset] : set)
         {
-            if (onset.from == model::noNode || (skipRelit && onsets.contains (id)))
+            if (onset.from == model::noNode || (skipRelit && layer.onsets.contains (id)))
                 continue;
 
-            const auto* from = track->findNode (onset.from);
-            const auto* to = track->findNode (id);
+            const auto* from = layer.track->findNode (onset.from);
+            const auto* to = layer.track->findNode (id);
             if (from == nullptr || to == nullptr)
                 continue;
 
@@ -721,36 +785,36 @@ void GraphView::paintLitEdges (juce::Graphics& g, double now) const
         }
     };
 
-    const auto fade = 1.0f - clamp01 ((now - cycleStartMs) / trailFadeMs);
+    const auto fade = 1.0f - clamp01 ((now - layer.cycleStartMs) / trailFadeMs);
     if (fade > 0.0f)
-        paintSet (previousOnsets, fade, true);
+        paintSet (layer.previousOnsets, fade, true);
 
-    paintSet (onsets, 1.0f, false);
+    paintSet (layer.onsets, 1.0f, false);
 }
 
-void GraphView::paintSparks (juce::Graphics& g) const
+void GraphView::paintSparks (juce::Graphics& g, const Layer& layer) const
 {
     // Chispa que viaja hacia la próxima nota, con una cola que recorre el espectro.
-    if (! playing || schedule == nullptr)
+    if (! playing || layer.schedule == nullptr)
         return;
 
-    for (const auto& e : schedule->events)
+    for (const auto& e : layer.schedule->events)
     {
-        if (e.from == model::noNode || onsets.contains (e.node) || e.startBeat < animBeat)
+        if (e.from == model::noNode || layer.onsets.contains (e.node) || e.startBeat < layer.animBeat)
             continue;
 
-        const auto parent = std::find_if (schedule->events.begin(), schedule->events.end(),
+        const auto parent = std::find_if (layer.schedule->events.begin(), layer.schedule->events.end(),
                                           [&e] (const engine::NoteEvent& p) { return p.node == e.from; });
-        if (parent == schedule->events.end() || parent->startBeat >= e.startBeat)
+        if (parent == layer.schedule->events.end() || parent->startBeat >= e.startBeat)
             continue;
 
         const auto window = std::min (e.startBeat - parent->startBeat, maxSparkBeats);
-        const auto progress = (animBeat - (e.startBeat - window)) / window;
+        const auto progress = (layer.animBeat - (e.startBeat - window)) / window;
         if (progress <= 0.0 || progress >= 1.0)
             continue;
 
-        const auto* from = track->findNode (e.from);
-        const auto* to = track->findNode (e.node);
+        const auto* from = layer.track->findNode (e.from);
+        const auto* to = layer.track->findNode (e.node);
         if (from == nullptr || to == nullptr)
             continue;
 
@@ -796,26 +860,26 @@ void GraphView::paintConnectionPreview (juce::Graphics& g) const
     g.drawDashedLine (juce::Line<float> (toScreen (*from), end), dashes, 2, 1.2f);
 }
 
-void GraphView::paintNodes (juce::Graphics& g, double now) const
+void GraphView::paintNodes (juce::Graphics& g, const Layer& layer, bool isActive, double now) const
 {
-    const auto selected = getSelectedNode();
-    const auto trailFade = 1.0f - clamp01 ((now - cycleStartMs) / trailFadeMs);
+    const auto selected = isActive ? getSelectedNode() : model::noNode;
+    const auto trailFade = 1.0f - clamp01 ((now - layer.cycleStartMs) / trailFadeMs);
 
-    for (const auto& node : track->nodes)
+    for (const auto& node : layer.track->nodes)
     {
         const auto centre = toScreen (node);
         const auto radius = starRadius (node);
-        const bool isStart = node.id == track->startNode;
-        const bool isEnd = node.id == track->endNode;
-        const bool hasStatusRing = isUnreachable (node.id) || isStart || isEnd;
+        const bool isStart = node.id == layer.track->startNode;
+        const bool isEnd = node.id == layer.track->endNode;
+        const bool hasStatusRing = (isActive && isUnreachable (layer, node.id)) || isStart || isEnd;
 
-        const auto onset = onsets.find (node.id);
-        const bool lit = onset != onsets.end();
+        const auto onset = layer.onsets.find (node.id);
+        const bool lit = onset != layer.onsets.end();
         const auto age = lit ? now - onset->second.ms : 0.0;
         const auto& pitches = lit ? onset->second.pitches : node.pitches;
 
         // Zona para conectar (el anillo exterior) al pasar el ratón.
-        if (node.id == hoverNode && drag == Drag::None)
+        if (isActive && node.id == hoverNode && drag == Drag::None)
         {
             g.setColour (colours::accent.withAlpha (0.08f));
             g.fillEllipse (juce::Rectangle<float> (nodeRadius * 2.0f, nodeRadius * 2.0f).withCentre (centre));
@@ -842,7 +906,7 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
         }
 
         // Halo mientras la nota suena.
-        if (isSounding (node.id))
+        if (isSounding (layer, node.id))
         {
             const auto halo = radius + 11.0f;
             g.setColour ((lit ? mainColour (pitches) : colours::accent).withAlpha (0.35f));
@@ -858,7 +922,7 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
             fill = flashColour (pitches, age);
             drawRadius += 3.5f * (1.0f - clamp01 (age / swellMs));
         }
-        else if (const auto previous = previousOnsets.find (node.id); previous != previousOnsets.end() && trailFade > 0.0f)
+        else if (const auto previous = layer.previousOnsets.find (node.id); previous != layer.previousOnsets.end() && trailFade > 0.0f)
         {
             fill = colours::star.interpolatedWith (trailColour (previous->second.pitches), trailFade);
         }
@@ -869,7 +933,7 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
         // Anillo de estado: inalcanzable, inicio o fin.
         if (hasStatusRing)
         {
-            const auto ring = isUnreachable (node.id) ? colours::unreachable
+            const auto ring = (isActive && isUnreachable (layer, node.id)) ? colours::unreachable
                             : isStart                 ? colours::nodeStart
                                                       : colours::nodeEnd;
             const auto r = radius + 5.0f;
@@ -878,7 +942,7 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
         }
 
         // Selección o destino al conectar: contorno blanco estelar por fuera de todo.
-        if (node.id == selected || node.id == hoverTarget)
+        if (node.id == selected || (isActive && node.id == hoverTarget))
         {
             const auto r = radius + (hasStatusRing ? 10.0f : 6.0f);
             g.setColour (colours::accent);
@@ -888,7 +952,7 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
         // Nombre de las notas arriba a la derecha: tenue, más claro al seleccionar o
         // al pasar el ratón, y en el color de la nota mientras destella.
         auto labelColour = colours::textDisabled.brighter (0.25f);
-        if (node.id == hoverNode || node.id == selected)
+        if ((isActive && node.id == hoverNode) || node.id == selected)
             labelColour = colours::textPrimary;
         if (lit)
             labelColour = mainColour (pitches).interpolatedWith (labelColour, clamp01 (age / 2200.0));
@@ -914,14 +978,15 @@ void GraphView::paintNodes (juce::Graphics& g, double now) const
 void GraphView::paintPlayhead (juce::Graphics& g) const
 {
     // La línea vertical solo tiene sentido en el modo línea de tiempo.
-    if (track->mode != model::PlaybackMode::Timeline || schedule == nullptr)
+    const auto* layer = activeLayer();
+    if (layer == nullptr || track->mode != model::PlaybackMode::Timeline || layer->schedule == nullptr)
         return;
 
     const auto* start = track->findNode (track->startNode);
     if (start == nullptr)
         return;
 
-    const auto x = toScreen (start->x + model::beatsToPixels (animBeat), 0.0).x;
+    const auto x = toScreen (start->x + model::beatsToPixels (layer->animBeat), 0.0).x;
 
     g.setColour (colours::playhead.withAlpha (playing ? 0.55f : 0.25f));
     g.drawLine (x, static_cast<float> (rulerHeight), x, static_cast<float> (getHeight()), 1.0f);
@@ -935,20 +1000,22 @@ void GraphView::paintEmptyHint (juce::Graphics& g) const
                 getLocalBounds().withTrimmedTop (rulerHeight), juce::Justification::centred);
 }
 
-bool GraphView::isSounding (model::NodeId node) const noexcept
+bool GraphView::isSounding (const Layer& layer, model::NodeId node) noexcept
 {
-    if (! playing || schedule == nullptr)
+    if (layer.schedule == nullptr)
         return false;
 
-    return std::any_of (schedule->events.begin(), schedule->events.end(), [this, node] (const engine::NoteEvent& e)
+    // Solo mientras se reproduce: el destello ya se encarga del resto.
+    return std::any_of (layer.schedule->events.begin(), layer.schedule->events.end(), [&layer, node] (const engine::NoteEvent& e)
     {
-        return e.node == node && animBeat >= e.startBeat && animBeat < e.startBeat + e.durationBeats;
+        return e.node == node && layer.animBeat >= e.startBeat && layer.animBeat < e.startBeat + e.durationBeats
+            && layer.onsets.contains (node);
     });
 }
 
-bool GraphView::isUnreachable (model::NodeId node) const noexcept
+bool GraphView::isUnreachable (const Layer& layer, model::NodeId node) noexcept
 {
-    return std::find (unreachable.begin(), unreachable.end(), node) != unreachable.end();
+    return std::find (layer.unreachable.begin(), layer.unreachable.end(), node) != layer.unreachable.end();
 }
 
 } // namespace chimedes::ui
