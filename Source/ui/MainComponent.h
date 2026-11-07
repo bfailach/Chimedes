@@ -76,6 +76,7 @@ private:
 
     // Interfaz
     FloatingPanel bottomBar;
+    FloatingPanel statusBar;   // avisos (nodos inalcanzables, audio): solo si hay alguno
     TransportButton stopButton { "Detener", TransportButton::Icon::Stop };
     TransportButton playButton { "Reproducir", TransportButton::Icon::Play };
     TransportButton pauseButton { "Pausa", TransportButton::Icon::Pause };

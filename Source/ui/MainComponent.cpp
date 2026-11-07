@@ -102,6 +102,7 @@ MainComponent::MainComponent()
 
     statusLabel.setColour (juce::Label::textColourId, theme::warning);
     statusLabel.setFont (juce::FontOptions (13.0f));
+    statusLabel.setJustificationType (juce::Justification::centred);
 
     // --- Edición -----------------------------------------------------------
     const EditCallbacks editCallbacks {
@@ -120,9 +121,11 @@ MainComponent::MainComponent()
     addAndMakeVisible (graphView);
     addAndMakeVisible (inspector);
     addAndMakeVisible (bottomBar);
+    addChildComponent (statusBar);
+    statusBar.addAndMakeVisible (statusLabel);
 
     for (auto* c : std::initializer_list<juce::Component*> {
-             &bpmLabel, &bpmSlider, &statusLabel, &stopButton, &playButton, &pauseButton,
+             &bpmLabel, &bpmSlider, &stopButton, &playButton, &pauseButton,
              &randomButton, &newButton, &undoButton, &redoButton })
         bottomBar.addAndMakeVisible (c);
 
@@ -229,7 +232,12 @@ void MainComponent::rebuildSchedule()
     graphView.setUnreachable (result.validation.unreachable);
 
     const auto problem = track.nodes.empty() ? juce::String() : describe (result);
-    statusLabel.setText (problem.isNotEmpty() ? problem : audioWarning, juce::dontSendNotification);
+    const auto status = problem.isNotEmpty() ? problem : audioWarning;
+    if (status != statusLabel.getText())
+    {
+        statusLabel.setText (status, juce::dontSendNotification);
+        resized();   // el aviso aparece, desaparece o cambia de largo
+    }
 }
 
 void MainComponent::updateUndoButtons()
@@ -312,35 +320,54 @@ void MainComponent::resized()
 
     area.reduce (margin, margin);
 
-    // Barra inferior: BPM y estado a la izquierda, transporte al centro, acciones a la derecha.
-    bottomBar.setBounds (area.removeFromBottom (barHeight));
+    // Barra inferior: mide lo justo para su contenido y queda centrada abajo.
+    // [BPM + control]  [detener, reproducir, pausa]  [aleatorio, nuevo]  [deshacer, rehacer]
+    constexpr int pad = 12;
+    constexpr int groupGap = 20;
+    constexpr int bpmWidth = 38 + 170;
+    constexpr int transportWidth = 3 * 44;
+    constexpr int actionsWidth = 4 * 40 + 2 + 14 + 2;
+    constexpr int barWidth = pad + bpmWidth + groupGap + transportWidth + groupGap + actionsWidth + pad;
+
+    auto barArea = area.removeFromBottom (barHeight);
+    bottomBar.setBounds (barArea.withSizeKeepingCentre (std::min (barWidth, barArea.getWidth()), barHeight));
     {
-        auto bar = bottomBar.getLocalBounds().reduced (10, 10);
+        auto bar = bottomBar.getLocalBounds().reduced (pad, 10);
 
-        auto transport = bar.withSizeKeepingCentre (3 * 44, bar.getHeight());
-        stopButton.setBounds (transport.removeFromLeft (44));
-        playButton.setBounds (transport.removeFromLeft (44));
-        pauseButton.setBounds (transport.removeFromLeft (44));
+        bpmLabel.setBounds (bar.removeFromLeft (38));
+        bpmSlider.setBounds (bar.removeFromLeft (170));
+        bar.removeFromLeft (groupGap);
 
-        auto right = bar.removeFromRight (bar.getWidth() / 2 - 3 * 22 - 12);
-        // Iconos: deshacer y rehacer juntos; aleatorio y nuevo, separados un poco más.
-        redoButton.setBounds (right.removeFromRight (40));
-        right.removeFromRight (2);
-        undoButton.setBounds (right.removeFromRight (40));
-        right.removeFromRight (14);
-        newButton.setBounds (right.removeFromRight (40));
-        right.removeFromRight (2);
-        randomButton.setBounds (right.removeFromRight (40));
+        stopButton.setBounds (bar.removeFromLeft (44));
+        playButton.setBounds (bar.removeFromLeft (44));
+        pauseButton.setBounds (bar.removeFromLeft (44));
+        bar.removeFromLeft (groupGap);
 
-        auto left = bar.removeFromLeft (bar.getWidth() - 3 * 44 - 12);
-        bpmLabel.setBounds (left.removeFromLeft (38));
-        bpmSlider.setBounds (left.removeFromLeft (170));
-        left.removeFromLeft (16);
-        statusLabel.setBounds (left);
+        // Aleatorio y nuevo juntos; deshacer y rehacer juntos, un poco más separados.
+        randomButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (2);
+        newButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (14);
+        undoButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (2);
+        redoButton.setBounds (bar.removeFromLeft (40));
+    }
+
+    // Aviso flotante justo encima de la barra, del largo de su texto.
+    area.removeFromBottom (10);
+    const auto status = statusLabel.getText();
+    statusBar.setVisible (status.isNotEmpty());
+    if (status.isNotEmpty())
+    {
+        const auto textWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (statusLabel.getFont(), status));
+        const auto width = std::min (textWidth + 36, area.getWidth());
+        statusBar.setBounds (juce::Rectangle<int> (width, 30).withCentre ({ bottomBar.getBounds().getCentreX(), area.getBottom() - 15 }));
+        statusLabel.setBounds (statusBar.getLocalBounds().reduced (12, 0));
+        area.removeFromBottom (30);
     }
 
     // Panel derecho flotante, centrado en vertical respecto a la ventana, sin pisar la barra.
-    area.removeFromBottom (16);
+    area.removeFromBottom (6);
     const auto panelHeight = std::min (inspector.getIdealHeight(), area.getHeight());
     const auto centredTop = (getHeight() - panelHeight) / 2;
     const auto top = juce::jlimit (area.getY(), area.getBottom() - panelHeight, centredTop);
