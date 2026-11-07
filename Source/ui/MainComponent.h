@@ -71,6 +71,13 @@ private:
     void deleteTrack (std::size_t index);
 
     void rebuildSchedules();
+    void showRandomMenu();
+
+    // Exportar
+    enum class ExportKind { Wav, Midi };
+    void showExportMenu();
+    void exportProject (ExportKind kind);
+    model::Project projectForExport() const;
 
     // Muestras de sonido
     void syncSamples();                       // decodifica las nuevas y las pasa al motor
@@ -140,6 +147,7 @@ private:
     IconButton newButton { "Nuevo (Ctrl+N)", IconButton::Icon::New };
     IconButton openButton { "Abrir (Ctrl+O)", IconButton::Icon::Open };
     IconButton saveButton { "Guardar (Ctrl+S)", IconButton::Icon::Save };
+    IconButton exportButton { "Exportar a WAV o MIDI", IconButton::Icon::Export };
     IconButton undoButton { "Deshacer (Ctrl+Z)", IconButton::Icon::Undo };
     IconButton redoButton { "Rehacer (Ctrl+Y)", IconButton::Icon::Redo };
     juce::Label statusLabel;
@@ -161,6 +169,7 @@ private:
     };
     std::map<std::string, DecodedSample> decodedSamples;
     std::vector<model::Sample> syncedSamples;
+    std::vector<audio::SampleData> sampleData;   // las que se pudieron cargar, para exportar
     juce::AudioFormatManager formatManager;
     int timerTicks = 0;
     bool initialFitDone = false;

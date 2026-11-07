@@ -2,15 +2,21 @@
 // de sonido, usando el mismo motor de audio que la aplicación. Sirve para comprobar
 // el audio en máquinas sin altavoces y es la base de la futura exportación a WAV.
 //
-// Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6]
+// Uso: ChimedesRender <salida.wav> [timeline|seq-bfs|seq-dfs|sim-bfs] [ciclos] [instrumento 1-6] [bpm]
+//      ChimedesRender <salida.wav> <proyecto.chimedes> [vueltas, 0 = completa]
+//
+// La segunda forma usa exactamente la misma exportación que la app (Exportar audio).
 
 #include <iostream>
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include "audio/AudioEngine.h"
+#include "audio/OfflineRender.h"
+#include "engine/Export.h"
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
+#include "model/ProjectFile.h"
 
 using namespace chimedes;
 
@@ -24,6 +30,46 @@ int main (int argc, char* argv[])
 
     const juce::File output (juce::File::getCurrentWorkingDirectory().getChildFile (argv[1]));
     const juce::String mode = argc > 2 ? argv[2] : "timeline";
+
+    if (mode.endsWithIgnoreCase (".chimedes"))
+    {
+        const auto projectFile = juce::File::getCurrentWorkingDirectory().getChildFile (mode);
+        const auto loaded = model::projectFromJson (projectFile.loadFileAsString().toStdString());
+        if (! loaded.ok)
+        {
+            std::cerr << loaded.error << "\n";
+            return 1;
+        }
+
+        // Muestras: rutas relativas a la carpeta del proyecto, como en la app.
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::vector<audio::SampleData> samples;
+        for (const auto& smp : loaded.project.samples)
+        {
+            const auto path = juce::String::fromUTF8 (smp.path.c_str());
+            const auto file = juce::File::isAbsolutePath (path) ? juce::File (path) : projectFile.getParentDirectory().getChildFile (path);
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+            if (reader == nullptr)
+            {
+                std::cerr << "Falta la muestra " << file.getFullPathName() << "\n";
+                continue;
+            }
+            auto buffer = std::make_shared<juce::AudioBuffer<float>> (2, static_cast<int> (reader->lengthInSamples));
+            reader->read (buffer.get(), 0, buffer->getNumSamples(), 0, true, true);
+            if (reader->numChannels == 1)
+                buffer->copyFrom (1, 0, *buffer, 0, 0, buffer->getNumSamples());
+            samples.push_back ({ static_cast<int> (smp.id), buffer, reader->sampleRate, smp.rootNote });
+        }
+
+        const auto loops = argc > 3 ? juce::String (argv[3]).getIntValue() : 0;
+        const auto beats = engine::exportLengthBeats (loaded.project, loops, 4096.0);
+        std::cout << "Exportando " << beats << " pulsos a " << loaded.project.bpm << " BPM\n";
+
+        const auto result = audio::renderProjectToWav (loaded.project, samples, beats, output);
+        std::cout << (result.wasOk() ? "Escrito " + output.getFullPathName() : result.getErrorMessage()) << "\n";
+        return result.wasOk() ? 0 : 1;
+    }
     const int cycles = argc > 3 ? juce::String (argv[3]).getIntValue() : 2;
 
     auto track = model::makeDemoTrack();

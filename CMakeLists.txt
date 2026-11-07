@@ -22,6 +22,7 @@ add_library(chimedes_core STATIC
     Source/model/NoteNames.cpp
     Source/model/Randomizer.cpp
     Source/model/ProjectFile.cpp
+    Source/engine/Export.cpp
     Source/engine/Adjacency.cpp
     Source/engine/Validator.cpp
     Source/engine/TreeBuilder.cpp
@@ -47,6 +48,7 @@ if(CHIMEDES_BUILD_TESTS)
         Tests/TreeBuilderTests.cpp
         Tests/SchedulerTests.cpp
         Tests/ProjectFileTests.cpp
+        Tests/ExportTests.cpp
         Tests/SequencerTests.cpp
         Tests/EditingTests.cpp
         Tests/RandomizerTests.cpp
@@ -71,6 +73,7 @@ if(CHIMEDES_BUILD_APP)
     target_sources(Chimedes PRIVATE
         Source/Main.cpp
         Source/audio/AudioEngine.cpp
+        Source/audio/OfflineRender.cpp
         Source/ui/ChimedesLookAndFeel.cpp
         Source/ui/Fonts.cpp
         Source/ui/GraphView.cpp
@@ -121,6 +124,7 @@ if(CHIMEDES_BUILD_APP)
     target_sources(ChimedesRender PRIVATE
         Tools/RenderDemo.cpp
         Source/audio/AudioEngine.cpp
+        Source/audio/OfflineRender.cpp
     )
 
     target_compile_definitions(ChimedesRender PRIVATE

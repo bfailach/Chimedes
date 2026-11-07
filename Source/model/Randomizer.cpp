@@ -188,4 +188,163 @@ void randomizeGraph (Track& track, std::uint32_t seed)
     track.endNode = track.nodes.back().id;
 }
 
+// ---------------------------------------------------------------------------
+// Aleatorizar una sola cosa, conservando el grafo
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Semillas derivadas: cada aspecto usa su propio dado, así "todo" con una semilla
+    // no repite las mismas tiradas en cada paso.
+    std::uint32_t mix (std::uint32_t seed, std::uint32_t salt)
+    {
+        auto h = seed ^ (salt * 0x9e3779b9u);
+        h ^= h >> 16;  h *= 0x85ebca6bu;  h ^= h >> 13;
+        return h;
+    }
+
+    // Orden en que se visita el grafo desde el inicio (anchura, ignorando el sentido
+    // de las aristas) y de qué nodo se llega a cada uno. Los nodos sueltos van al final.
+    std::vector<std::pair<NodeId, NodeId>> walkFromStart (const Track& track)
+    {
+        std::vector<std::pair<NodeId, NodeId>> order;   // (nodo, desde)
+        std::vector<NodeId> seen;
+        const auto visited = [&seen] (NodeId id) { return std::find (seen.begin(), seen.end(), id) != seen.end(); };
+
+        auto start = track.findNode (track.startNode) != nullptr ? track.startNode
+                   : track.nodes.empty() ? noNode : track.nodes.front().id;
+
+        const auto visitFrom = [&] (NodeId root)
+        {
+            order.push_back ({ root, noNode });
+            seen.push_back (root);
+            for (std::size_t i = order.size() - 1; i < order.size(); ++i)
+                for (const auto& e : track.edges)
+                {
+                    const auto here = order[i].first;
+                    const auto other = e.from == here ? e.to : e.to == here ? e.from : noNode;
+                    if (other != noNode && ! visited (other))
+                    {
+                        seen.push_back (other);
+                        order.push_back ({ other, here });
+                    }
+                }
+        };
+
+        if (start != noNode)
+            visitFrom (start);
+        for (const auto& n : track.nodes)
+            if (! visited (n.id))
+                visitFrom (n.id);
+
+        return order;
+    }
+}
+
+void randomizeNotes (Track& track, std::uint32_t seed)
+{
+    if (track.nodes.empty())
+        return;
+
+    Dice dice (seed);
+    const auto& scale = scales[static_cast<std::size_t> (dice.between (0, static_cast<int> (scales.size()) - 1))];
+    const auto root = dice.between (0, 11);
+    const auto chordChance = dice.between (0.05, 0.3);
+
+    std::vector<std::pair<NodeId, int>> degreeOf;
+    const auto degree = [&degreeOf] (NodeId id)
+    {
+        for (const auto& [n, d] : degreeOf)
+            if (n == id)
+                return d;
+        return 0;
+    };
+
+    for (const auto& [id, from] : walkFromStart (track))
+    {
+        const auto d = from == noNode ? dice.between (-1, 2) : std::clamp (degree (from) + dice.between (-2, 2), -4, 11);
+        degreeOf.push_back ({ id, d });
+
+        auto* n = &*std::find_if (track.nodes.begin(), track.nodes.end(), [id] (const Node& x) { return x.id == id; });
+        if (dice.chance (chordChance))
+            n->pitches = { pitchOf (scale, root, d), pitchOf (scale, root, d + 2), pitchOf (scale, root, d + 4) };
+        else
+            n->pitches = { pitchOf (scale, root, d) };
+    }
+
+    // El fin cierra en la tónica.
+    for (auto& n : track.nodes)
+        if (n.id == track.endNode)
+            n.pitches = { pitchOf (scale, root, 0) };
+}
+
+void randomizeRhythm (Track& track, std::uint32_t seed)
+{
+    Dice dice (seed);
+
+    // Un carácter para toda la pista: más cortas o más largas, más parejas o más acentuadas.
+    const auto longer = dice.between (0.0, 1.0);
+    const auto baseVelocity = dice.between (60, 100);
+    const auto accent = dice.between (0, 35);
+
+    constexpr std::array<double, 6> durations { 0.25, 0.5, 0.5, 1.0, 1.5, 2.0 };
+
+    for (auto& n : track.nodes)
+    {
+        if (n.id != track.endNode)
+        {
+            // Sesgo hacia las largas o las cortas según el carácter.
+            const auto u = std::pow (dice.between (0.0, 1.0), 1.5 - longer);
+            n.durationBeats = durations[std::min (durations.size() - 1, static_cast<std::size_t> (u * durations.size()))];
+        }
+
+        n.velocity = std::clamp (baseVelocity + (dice.chance (0.3) ? accent : 0) + dice.between (-10, 10), 30, 127);
+    }
+}
+
+void randomizeInstruments (Track& track, std::uint32_t seed, const std::vector<InstrumentId>& available)
+{
+    if (available.empty())
+        return;
+
+    Dice dice (seed);
+    const auto pick = [&] { return available[static_cast<std::size_t> (dice.between (0, static_cast<int> (available.size()) - 1))]; };
+
+    track.instrument = pick();
+
+    // A veces, unos pocos nodos con otro instrumento (un color distinto en la frase).
+    const auto accents = available.size() > 1 && dice.chance (0.5);
+    for (auto& n : track.nodes)
+    {
+        n.instrument = 0;   // como la pista
+        if (accents && dice.chance (0.2))
+        {
+            auto other = pick();
+            while (other == track.instrument)
+                other = pick();
+            n.instrument = other;
+        }
+    }
+}
+
+void randomizeAlgorithm (Track& track, std::uint32_t seed)
+{
+    Dice dice (seed);
+
+    track.treeMethod = static_cast<TreeMethod> (dice.between (0, track.directed ? 2 : 3));   // Prim solo sin dirección
+    track.traversal = dice.chance (0.5) ? Traversal::BFS : Traversal::DFS;
+    track.siblings = dice.chance (0.5) ? SiblingMode::Sequential : SiblingMode::Simultaneous;
+
+    constexpr std::array<double, 4> steps { 0.0, 1.0, 0.5, 0.25 };
+    track.quantizeBeats = dice.chance (0.75) ? steps[static_cast<std::size_t> (dice.between (1, 3))] : 0.0;   // casi siempre a pulso
+}
+
+void randomizeEverything (Track& track, std::uint32_t seed, const std::vector<InstrumentId>& available)
+{
+    randomizeGraph (track, mix (seed, 1));
+    randomizeRhythm (track, mix (seed, 2));
+    randomizeInstruments (track, mix (seed, 3), available);
+    randomizeAlgorithm (track, mix (seed, 4));
+}
+
 } // namespace chimedes::model

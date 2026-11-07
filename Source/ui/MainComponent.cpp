@@ -5,6 +5,8 @@
 #include "engine/Scheduler.h"
 #include "model/DemoProject.h"
 #include "model/Instruments.h"
+#include "audio/OfflineRender.h"
+#include "engine/Export.h"
 #include "model/ProjectFile.h"
 #include "model/Randomizer.h"
 #include "ui/Text.h"
@@ -119,16 +121,9 @@ MainComponent::MainComponent()
     newButton.onClick = [this] { newProject(); };
     openButton.onClick = [this] { openProject(); };
     saveButton.onClick = [this] { saveProject(); };
-    randomButton.setTooltip (text ("Grafo nuevo al azar: cantidad de nodos, forma, separación y duración"));
-    randomButton.onClick = [this]
-    {
-        const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
-        graphView.selectNode (model::noNode);
-        applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); });
-
-        // Encuadra el grafo nuevo en la parte del lienzo que no tapan los paneles.
-        graphView.zoomToFit (freeCanvasArea());
-    };
+    exportButton.onClick = [this] { showExportMenu(); };
+    randomButton.setTooltip (text ("Aleatorio: grafo, notas, ritmo, instrumentos o algoritmo"));
+    randomButton.onClick = [this] { showRandomMenu(); };
     undoButton.onClick = [this] { undoManager.undo(); };
     redoButton.onClick = [this] { undoManager.redo(); };
 
@@ -187,7 +182,7 @@ MainComponent::MainComponent()
     projectLabel.setColour (juce::Label::textColourId, theme::textPrimary);
     projectLabel.setFont (theme::sans (13.0f));
     projectLabel.setInterceptsMouseClicks (false, false);
-    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &projectLabel })
+    for (auto* c : std::initializer_list<juce::Component*> { &newButton, &openButton, &saveButton, &exportButton, &projectLabel })
         topBar.addAndMakeVisible (c);
     addChildComponent (statusBar);
     statusBar.addAndMakeVisible (statusLabel);
@@ -526,7 +521,7 @@ void MainComponent::resized()
         constexpr int pad = 8;
         const auto nameWidth = juce::jlimit (60, 320, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
                                                           projectLabel.getFont(), projectLabel.getText())) + 8);
-        const auto width = pad + 3 * 40 + 2 * 2 + 12 + nameWidth + 14;
+        const auto width = pad + 4 * 40 + 3 * 2 + 12 + nameWidth + 14;
 
         topBar.setBounds (juce::Rectangle<int> (width, topBarHeight)
                               .withCentre ({ getWidth() / 2, topBarY + topBarHeight / 2 }));
@@ -537,6 +532,8 @@ void MainComponent::resized()
         openButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (2);
         saveButton.setBounds (bar.removeFromLeft (40));
+        bar.removeFromLeft (2);
+        exportButton.setBounds (bar.removeFromLeft (40));
         bar.removeFromLeft (12);
         projectLabel.setBounds (bar);
     }
@@ -606,6 +603,237 @@ void MainComponent::resized()
     const auto centredTop = (getHeight() - panelHeight) / 2;
     const auto top = juce::jlimit (area.getY(), area.getBottom() - panelHeight, centredTop);
     inspector.setBounds (area.getRight() - inspectorWidth, top, inspectorWidth, panelHeight);
+}
+
+// ---------------------------------------------------------------------------
+// Aleatorio
+// ---------------------------------------------------------------------------
+
+void MainComponent::showRandomMenu()
+{
+    enum Item { graph = 1, notes, rhythm, instruments, algorithm, everything, everythingAllTracks };
+
+    const bool algorithmMode = activeTrack().mode == model::PlaybackMode::Algorithm;
+    const bool empty = activeTrack().nodes.empty();
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader (text ("Al azar, en la pista activa"));
+    menu.addItem (graph, text ("Grafo nuevo"));
+    menu.addItem (notes, text ("Notas (misma forma)"), ! empty);
+    menu.addItem (rhythm, text ("Ritmo: duraciones e intensidades"), ! empty);
+    menu.addItem (instruments, text ("Instrumentos"));
+    menu.addItem (algorithm, algorithmMode ? text ("Algoritmo: árbol, recorrido, hermanos")
+                                           : text ("Algoritmo (solo en modo algoritmo)"), algorithmMode);
+    menu.addItem (everything, text ("Todo"));
+    menu.addSeparator();
+    menu.addItem (everythingAllTracks, text ("Todo, en todas las pistas"));
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&randomButton),
+                        [safe = juce::Component::SafePointer<MainComponent> (this)] (int result)
+    {
+        if (safe == nullptr || result == 0)
+            return;
+
+        auto& self = *safe;
+        const auto seed = static_cast<std::uint32_t> (juce::Random::getSystemRandom().nextInt());
+
+        // Instrumentos posibles: los integrados y las muestras que se pudieron cargar.
+        std::vector<model::InstrumentId> available;
+        for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+            available.push_back (static_cast<model::InstrumentId> (id));
+        for (const auto& smp : self.project.samples)
+            if (self.decodedSamples.count (smp.path) > 0)
+                available.push_back (smp.id);
+
+        const bool newShape = result == graph || result == everything || result == everythingAllTracks;
+        if (newShape)
+            self.graphView.selectNode (model::noNode);
+
+        switch (result)
+        {
+            case graph:       self.applyEdit ([seed] (model::Track& t) { model::randomizeGraph (t, seed); }); break;
+            case notes:       self.applyEdit ([seed] (model::Track& t) { model::randomizeNotes (t, seed); }); break;
+            case rhythm:      self.applyEdit ([seed] (model::Track& t) { model::randomizeRhythm (t, seed); }); break;
+            case instruments: self.applyEdit ([seed, available] (model::Track& t) { model::randomizeInstruments (t, seed, available); }); break;
+            case algorithm:   self.applyEdit ([seed] (model::Track& t) { model::randomizeAlgorithm (t, seed); }); break;
+            case everything:  self.applyEdit ([seed, available] (model::Track& t) { model::randomizeEverything (t, seed, available); }); break;
+            case everythingAllTracks:
+                // Un solo paso de deshacer para todas las pistas; cada una con su semilla.
+                self.applyProjectEdit ([seed, available] (model::Project& p)
+                {
+                    for (std::size_t i = 0; i < p.tracks.size(); ++i)
+                        model::randomizeEverything (p.tracks[i], seed + static_cast<std::uint32_t> (i) * 7919u, available);
+                });
+                break;
+            default: break;
+        }
+
+        // Una forma nueva se encuadra en la parte del lienzo que no tapan los paneles.
+        if (newShape)
+            self.graphView.zoomToFit (self.freeCanvasArea());
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Exportar
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Render del WAV en segundo plano, con barra de progreso y botón de cancelar.
+    class WavExportJob : public juce::ThreadWithProgressWindow
+    {
+    public:
+        WavExportJob (model::Project projectToRender, std::vector<audio::SampleData> samplesToUse,
+                      double beats, juce::File target)
+            : juce::ThreadWithProgressWindow (juce::String::fromUTF8 ("Exportando audio…"), true, true),
+              project (std::move (projectToRender)), samples (std::move (samplesToUse)),
+              lengthBeats (beats), file (std::move (target)) {}
+
+        void run() override
+        {
+            result = audio::renderProjectToWav (project, samples, lengthBeats, file, {}, [this] (double p)
+            {
+                setProgress (p);
+                return ! threadShouldExit();
+            });
+        }
+
+        // En el hilo de la interfaz, al terminar o cancelar.
+        void threadComplete (bool userPressedCancel) override
+        {
+            if (! userPressedCancel)
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                                  .withIconType (juce::MessageBoxIconType::NoIcon)
+                                                  .withTitle (result.wasOk() ? juce::String::fromUTF8 ("Audio exportado")
+                                                                             : juce::String::fromUTF8 ("No se pudo exportar"))
+                                                  .withMessage (result.wasOk() ? file.getFullPathName() : result.getErrorMessage())
+                                                  .withButton ("Aceptar"),
+                                              nullptr);
+            delete this;
+        }
+
+    private:
+        model::Project project;
+        std::vector<audio::SampleData> samples;
+        double lengthBeats;
+        juce::File file;
+        juce::Result result { juce::Result::ok() };
+    };
+
+    juce::String formatSeconds (double seconds)
+    {
+        const auto total = static_cast<int> (std::ceil (seconds));
+        return total < 60 ? juce::String (total) + " s"
+                          : juce::String (total / 60) + ":" + juce::String (total % 60).paddedLeft ('0', 2) + " min";
+    }
+}
+
+model::Project MainComponent::projectForExport() const
+{
+    auto p = project;
+    p.bpm = engine.getBpm();
+    return p;
+}
+
+void MainComponent::showExportMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, text ("Exportar audio (WAV)…"));
+    menu.addItem (2, text ("Exportar MIDI…"));
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exportButton),
+                        [safe = juce::Component::SafePointer<MainComponent> (this)] (int result)
+    {
+        if (safe != nullptr && result != 0)
+            safe->exportProject (result == 1 ? ExportKind::Wav : ExportKind::Midi);
+    });
+}
+
+void MainComponent::exportProject (ExportKind kind)
+{
+    constexpr double maxBeats = 4096.0;
+    const auto p = projectForExport();
+    const auto secondsFor = [&p] (double beats) { return beats * 60.0 / p.bpm; };
+
+    if (engine::exportLengthBeats (p, 1, maxBeats) <= 0.0)
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
+                                          .withTitle (text ("Nada que exportar"))
+                                          .withMessage (text ("Ninguna pista suena: revisa que tengan inicio y fin, y que no estén silenciadas."))
+                                          .withButton ("Aceptar"),
+                                      nullptr);
+        return;
+    }
+
+    // Duraciones posibles, con lo que dura cada una a este BPM.
+    struct Choice { juce::String label; double beats; };
+    std::vector<Choice> choices;
+    const auto full = engine::exportLengthBeats (p, 0, maxBeats);
+    choices.push_back ({ text ("Vuelta completa: hasta que todas las pistas coinciden"), full });
+    for (const auto cycles : { 1, 2, 4, 8 })
+        choices.push_back ({ cycles == 1 ? text ("1 vuelta de la pista más larga")
+                                         : juce::String (cycles) + text (" vueltas de la pista más larga"),
+                             engine::exportLengthBeats (p, cycles, maxBeats) });
+
+    juce::StringArray labels;
+    for (const auto& c : choices)
+        labels.add (c.label + "  (" + formatSeconds (secondsFor (c.beats)) + ")");
+
+    auto* dialog = new juce::AlertWindow (kind == ExportKind::Wav ? text ("Exportar audio (WAV)") : text ("Exportar MIDI"),
+                                          kind == ExportKind::Wav
+                                              ? text ("Suenan las pistas no silenciadas, con sus instrumentos y muestras, a ") + juce::String (p.bpm, 0) + " BPM."
+                                              : text ("Una pista MIDI por cada pista que suena, con su nombre, a ") + juce::String (p.bpm, 0) + " BPM.",
+                                          juce::MessageBoxIconType::NoIcon, this);
+    dialog->addComboBox ("length", labels, text ("Duración"));
+    auto choice = std::make_shared<int> (0);
+    if (auto* box = dialog->getComboBoxComponent ("length"))
+        box->onChange = [box, choice] { *choice = box->getSelectedItemIndex(); };
+    dialog->addButton (text ("Elegir archivo…"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    dialog->addButton ("Cancelar", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    dialog->enterModalState (true, juce::ModalCallbackFunction::create (
+        [safe = juce::Component::SafePointer<MainComponent> (this), kind, choices, choice, p] (int result)
+    {
+        if (safe == nullptr || result != 1)
+            return;
+
+        const auto beats = choices[static_cast<std::size_t> (std::clamp (*choice, 0, static_cast<int> (choices.size()) - 1))].beats;
+        const auto extension = kind == ExportKind::Wav ? juce::String (".wav") : juce::String (".mid");
+        const auto name = safe->projectDisplayName() + extension;
+
+        safe->fileChooser = std::make_unique<juce::FileChooser> (kind == ExportKind::Wav ? text ("Exportar audio") : text ("Exportar MIDI"),
+                                                                 safe->defaultFolder().getChildFile (name), "*" + extension);
+
+        safe->fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                            | juce::FileBrowserComponent::warnAboutOverwriting,
+                                        [safe, kind, beats, extension, p] (const juce::FileChooser& chooser)
+        {
+            auto file = chooser.getResult();
+            if (safe == nullptr || file == juce::File())
+                return;
+            if (! file.hasFileExtension (extension))
+                file = file.withFileExtension (extension);
+            file.getParentDirectory().createDirectory();
+
+            if (kind == ExportKind::Wav)
+            {
+                (new WavExportJob (p, safe->sampleData, beats, file))->launchThread();
+                return;
+            }
+
+            const auto bytes = engine::exportMidi (p, beats);
+            const auto ok = file.replaceWithData (bytes.data(), bytes.size());
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (ok ? text ("MIDI exportado") : text ("No se pudo exportar"))
+                                              .withMessage (ok ? file.getFullPathName()
+                                                               : text ("No se pudo escribir ") + file.getFullPathName())
+                                              .withButton ("Aceptar"),
+                                          nullptr);
+        });
+    }), true);
 }
 
 // ---------------------------------------------------------------------------
@@ -684,6 +912,7 @@ void MainComponent::syncSamples()
     }
 
     engine.setSamples (data);
+    sampleData = data;
     syncedSamples = project.samples;
 
     // Si falta alguna, se avisa; esa muestra queda en silencio hasta que vuelva.

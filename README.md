@@ -26,7 +26,11 @@ Fase 3 completa:
 - [x] Edición en vivo mientras suena
 - [x] Muestras de sonido propias como instrumentos
 
-Siguiente: fase 4 (aleatorizar todos los parámetros, exportar a WAV y MIDI).
+Fase 4 completa:
+
+- [x] Aleatorizar el grafo, las notas, el ritmo, los instrumentos o el algoritmo, por separado o todo junto
+- [x] Exportar a WAV
+- [x] Exportar a MIDI
 
 ## Uso
 
@@ -46,7 +50,8 @@ La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de
 | Guardar la nota o el acorde | **Enter** (Esc descarta la propuesta) |
 | Nuevo, abrir, guardar | Iconos de hoja, carpeta y disquete de la barra superior (junto al nombre del proyecto), o **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Mayús+S**: guardar como). Antes de cerrar, abrir otro o empezar uno nuevo, si hay cambios sin guardar, la app pregunta |
 | Pistas | Panel izquierdo: clic activa una pista (la que se edita; las demás se ven atenuadas y siguen sonando), doble clic la renombra, el altavoz la silencia, **+** agrega una (hasta 16) y el clic derecho duplica o elimina. Un clic en una estrella atenuada también activa su pista. Todo se puede deshacer |
-| Grafo al azar | Botón **Aleatorio** (icono de dado; se puede deshacer) |
+| Al azar | Botón **Aleatorio** (icono de dado): un menú para sortear en la pista activa el grafo, las notas, el ritmo, los instrumentos o el algoritmo, todo junto, o todo en todas las pistas. Se puede deshacer |
+| Exportar | Icono de bandeja de la barra superior: **WAV** (audio, 48 kHz y 24 bits) o **MIDI**, eligiendo la duración |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |
 | Reproducir / pausa | Barra espaciadora |
@@ -88,7 +93,28 @@ El proyecto guarda la ruta del archivo, no el audio. Si la muestra está dentro 
 
 ## Aleatorio
 
-Genera un grafo nuevo al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas caen sobre una rejilla de pulsos o medios pulsos y la última termina justo al acabar el ciclo, así que el ciclo dura un número entero de pulsos y la música sigue al BPM. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
+El dado abre un menú. Todo afecta a la pista activa, salvo la última opción, y se puede deshacer:
+
+- **Grafo nuevo**: ver abajo.
+- **Notas**: misma forma, escala y tonalidad nuevas; la melodía sigue las aristas desde el inicio y el fin vuelve a la tónica.
+- **Ritmo**: duraciones e intensidades nuevas, con un carácter para toda la pista (más cortas o largas, más parejas o acentuadas). El nodo de fin conserva su duración, así el ciclo dura lo mismo.
+- **Instrumentos**: el de la pista y, a veces, algunos nodos con otro, entre los integrados y las muestras cargadas.
+- **Algoritmo** (en modo algoritmo): árbol (Prim solo en grafos no dirigidos), recorrido, hermanos y ajuste al pulso.
+- **Todo**, y **Todo, en todas las pistas** (cada una con su propio sorteo, en un solo paso de deshacer).
+
+El grafo nuevo es al azar: de 5 a 14 nodos; forma de cadena, ramas, abanico o red; nodos repartidos o apiñados; dispersión vertical variable; y una duración total de 4 a 16 pulsos. Las notas caen sobre una rejilla de pulsos o medios pulsos y la última termina justo al acabar el ciclo, así que el ciclo dura un número entero de pulsos y la música sigue al BPM. Las notas salen de una escala y tonalidad al azar, con algún acorde, y la última nota vuelve a la tónica. El grafo siempre se puede reproducir y la vista se ajusta para mostrarlo entero.
+
+## Exportar
+
+Desde el icono de bandeja de la barra superior. Antes de elegir el archivo se elige la duración, con lo que dura a ese BPM:
+
+- **Vuelta completa**: hasta que todas las pistas vuelven a coincidir (el mínimo común múltiplo de sus ciclos; una pista de 3 pulsos y otra de 4 dan 12). Si eso pasa de 4096 pulsos, tantas vueltas de la pista más larga como quepan.
+- **1, 2, 4 u 8 vueltas** de la pista más larga.
+
+Solo suenan las pistas no silenciadas.
+
+- **WAV**: el audio tal como suena, con el mismo motor, instrumentos y muestras, renderizado más rápido que en tiempo real, con barra de progreso y botón de cancelar. Estéreo, 48 kHz, 24 bits, con 2 segundos de cola al final para que las notas se apaguen. Si la mezcla pasa de 0 dB, se baja el volumen entero para que no recorte.
+- **MIDI**: archivo estándar (formato 1) con una pista de tempo y una pista MIDI por cada pista, con su nombre. Cada instrumento va en su canal (el 10, percusión en General MIDI, nunca se usa) y los integrados llevan un programa General MIDI parecido: órgano, piano eléctrico, campanas tubulares, guitarra de nailon, pad cálido y bajo. Las muestras no llevan programa: en el programa de destino se les asigna el sonido que se quiera.
 
 ## Compilar
 
@@ -125,7 +151,7 @@ cmake --build build-tests
 
 ## Renderizar sin tarjeta de sonido
 
-`ChimedesRender` se compila junto con la aplicación y renderiza el grafo de demostración a WAV con el mismo motor de audio:
+`ChimedesRender` se compila junto con la aplicación y renderiza a WAV con el mismo motor de audio: el grafo de demostración, o un proyecto con la misma exportación que la app (`ChimedesRender salida.wav proyecto.chimedes [vueltas, 0 = completa]`):
 
 ```sh
 ./build/ChimedesRender_artefacts/Debug/ChimedesRender demo.wav timeline 2 3

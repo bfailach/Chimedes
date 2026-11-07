@@ -142,3 +142,134 @@ TEST ("aleatorio: las notas caen en medios pulsos y el ciclo dura pulsos enteros
             CHECK (s.events[i].startBeat > s.events[i - 1].startBeat);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Aleatorizar una sola cosa
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Igual forma: mismos nodos (id y posición) y mismas aristas.
+    bool sameShape (const model::Track& a, const model::Track& b)
+    {
+        if (a.nodes.size() != b.nodes.size() || ! (a.edges == b.edges) || a.startNode != b.startNode || a.endNode != b.endNode)
+            return false;
+        for (std::size_t i = 0; i < a.nodes.size(); ++i)
+            if (a.nodes[i].id != b.nodes[i].id || a.nodes[i].x != b.nodes[i].x || a.nodes[i].y != b.nodes[i].y)
+                return false;
+        return true;
+    }
+
+    model::Track randomTrack (std::uint32_t seed, bool directed = true)
+    {
+        model::Track t;
+        t.id = 1;
+        t.directed = directed;
+        model::randomizeGraph (t, seed);
+        return t;
+    }
+}
+
+TEST ("aleatorio de notas: cambia las notas, conserva la forma y cierra en la tónica")
+{
+    for (std::uint32_t seed = 1; seed <= 100; ++seed)
+    {
+        const auto before = randomTrack (seed);
+        auto t = before;
+        model::randomizeNotes (t, seed + 1000);
+
+        CHECK (sameShape (before, t));
+        for (const auto& n : t.nodes)
+        {
+            CHECK (! n.pitches.empty());
+            for (const auto p : n.pitches)
+                CHECK (p >= 24 && p <= 108);
+        }
+        CHECK (t.findNode (t.endNode)->pitches.size() == 1);
+        CHECK (engine::buildSchedule (t).ok());
+    }
+
+    // Misma semilla, mismo resultado.
+    auto a = randomTrack (7), b = randomTrack (7);
+    model::randomizeNotes (a, 99);
+    model::randomizeNotes (b, 99);
+    CHECK (a == b);
+}
+
+TEST ("aleatorio de ritmo: conserva la forma y la duración del fin")
+{
+    for (std::uint32_t seed = 1; seed <= 100; ++seed)
+    {
+        const auto before = randomTrack (seed);
+        auto t = before;
+        model::randomizeRhythm (t, seed * 3);
+
+        CHECK (sameShape (before, t));
+        CHECK (t.findNode (t.endNode)->durationBeats == before.findNode (before.endNode)->durationBeats);
+        for (const auto& n : t.nodes)
+        {
+            CHECK (n.durationBeats >= 0.25 && n.durationBeats <= 2.0);
+            CHECK (n.velocity >= 30 && n.velocity <= 127);
+        }
+
+        // En línea de tiempo el ciclo no cambia de largo.
+        CHECK (engine::buildSchedule (t).schedule->cycleLengthBeats == engine::buildSchedule (before).schedule->cycleLengthBeats);
+    }
+}
+
+TEST ("aleatorio de instrumentos: solo usa los disponibles")
+{
+    const std::vector<model::InstrumentId> available { 2, 5, 7 };
+    for (std::uint32_t seed = 1; seed <= 100; ++seed)
+    {
+        auto t = randomTrack (seed);
+        model::randomizeInstruments (t, seed, available);
+
+        CHECK (std::find (available.begin(), available.end(), t.instrument) != available.end());
+        for (const auto& n : t.nodes)
+            CHECK (n.instrument == 0 || (std::find (available.begin(), available.end(), n.instrument) != available.end()
+                                         && n.instrument != t.instrument));
+    }
+
+    auto t = randomTrack (3);
+    const auto before = t;
+    model::randomizeInstruments (t, 3, {});
+    CHECK (t == before);
+}
+
+TEST ("aleatorio de algoritmo: Prim solo en grafos no dirigidos y siempre se puede reproducir")
+{
+    for (std::uint32_t seed = 1; seed <= 200; ++seed)
+    {
+        for (const bool directed : { true, false })
+        {
+            auto t = randomTrack (seed, directed);
+            t.mode = model::PlaybackMode::Algorithm;
+            model::randomizeAlgorithm (t, seed);
+
+            CHECK (t.mode == model::PlaybackMode::Algorithm);
+            if (directed)
+                CHECK (t.treeMethod != model::TreeMethod::Prim);
+            CHECK (engine::buildSchedule (t).ok());
+        }
+    }
+}
+
+TEST ("aleatorio de todo: siempre se puede reproducir y respeta las opciones de la pista")
+{
+    const std::vector<model::InstrumentId> available { 1, 2, 3, 4, 5, 6 };
+    for (std::uint32_t seed = 1; seed <= 200; ++seed)
+    {
+        model::Track t;
+        t.id = 4;
+        t.name = "Bajo";
+        t.directed = seed % 2 == 0;
+        t.mode = seed % 3 == 0 ? model::PlaybackMode::Algorithm : model::PlaybackMode::Timeline;
+        const auto before = t;
+
+        model::randomizeEverything (t, seed, available);
+
+        CHECK (engine::buildSchedule (t).ok());
+        CHECK (t.id == before.id && t.name == before.name && t.directed == before.directed && t.mode == before.mode);
+    }
+}

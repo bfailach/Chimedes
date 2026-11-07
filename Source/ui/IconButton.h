@@ -13,7 +13,7 @@ namespace chimedes::ui
 class IconButton : public juce::Button
 {
 public:
-    enum class Icon { Random, New, Open, Save, Undo, Redo, Add };
+    enum class Icon { Random, New, Open, Save, Export, Undo, Redo, Add };
 
     IconButton (const juce::String& name, Icon iconToUse)
         : juce::Button (name), icon (iconToUse)
@@ -81,6 +81,23 @@ public:
                 plus.startNewSubPath (x + 7.0f, y + 11.0f);
                 plus.lineTo (x + 12.0f, y + 11.0f);
                 g.strokePath (plus, stroke);
+                break;
+            }
+
+            case Icon::Export:
+            {
+                // Bandeja con una flecha que sale hacia arriba.
+                juce::Path tray;
+                tray.startNewSubPath (x + 2.0f, y + 10.5f);
+                tray.lineTo (x + 2.0f, y + 16.0f);
+                tray.lineTo (x + 16.0f, y + 16.0f);
+                tray.lineTo (x + 16.0f, y + 10.5f);
+                tray.startNewSubPath (x + 9.0f, y + 12.0f);
+                tray.lineTo (x + 9.0f, y + 2.0f);
+                tray.startNewSubPath (x + 5.0f, y + 6.0f);
+                tray.lineTo (x + 9.0f, y + 2.0f);
+                tray.lineTo (x + 13.0f, y + 6.0f);
+                g.strokePath (tray, stroke);
                 break;
             }
 
