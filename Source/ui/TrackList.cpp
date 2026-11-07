@@ -94,7 +94,7 @@ public:
         addAndMakeVisible (mute);
     }
 
-    void update (std::size_t newIndex, const model::Track& track, bool isActive)
+    void update (std::size_t newIndex, const model::Track& track, const juce::String& instrumentName, bool isActive)
     {
         index = newIndex;
         active = isActive;
@@ -107,7 +107,7 @@ public:
                                                                : theme::textSecondary);
 
         // Instrumento de la pista, abreviado, para distinguirlas de un vistazo.
-        detail.setText (text (model::instruments::name (track.instrument)), juce::dontSendNotification);
+        detail.setText (instrumentName, juce::dontSendNotification);
 
         mute.setToggleState (track.muted, juce::dontSendNotification);
         mute.setTooltip (track.muted ? text ("Volver a oír") : text ("Silenciar"));
@@ -195,7 +195,9 @@ void TrackList::refresh (const model::Project& project, std::size_t activeIndex)
         rows.pop_back();
 
     for (std::size_t i = 0; i < rows.size(); ++i)
-        rows[i]->update (i, project.tracks[i], i == activeIndex);
+        rows[i]->update (i, project.tracks[i],
+                         juce::String::fromUTF8 (model::instrumentDisplayName (project, project.tracks[i].instrument).c_str()),
+                         i == activeIndex);
 
     addButton.setEnabled (project.tracks.size() < maxTracks);
     addButton.setTooltip (project.tracks.size() < maxTracks ? text ("Pista nueva")

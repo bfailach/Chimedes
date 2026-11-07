@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <utility>
+#include <vector>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "model/Track.h"
@@ -29,6 +33,13 @@ public:
     // resuelto (el del nodo o el de la pista).
     std::function<void (int pitch, int velocity, int instrument)> onAudition;
 
+    // Muestras del proyecto para los desplegables de instrumento (id y nombre).
+    // `canLoadMore` habilita "Cargar muestra…" (hay como mucho diez).
+    void setSampleChoices (std::vector<std::pair<model::InstrumentId, juce::String>> samples, bool canLoadMore);
+
+    // "Cargar muestra…" en el desplegable de la pista (false) o del nodo (true).
+    std::function<void (bool forNode)> onLoadSample;
+
     // Teclado de la computadora para el piano (solo con un nodo seleccionado).
     bool handlePianoKeyPress (const juce::KeyPress& key);
     bool handlePianoKeyStateChange();
@@ -41,11 +52,17 @@ private:
     int layout (bool apply);  // coloca los controles (si apply) y devuelve el alto total
     void editNode (const std::function<void (model::Node&)>& change);
     void updateNotesDisplay();
+    void rebuildInstrumentBoxes();
     void connectSlider (juce::Slider& slider, std::function<void (model::Node&, double)> apply);
 
     model::NodeId node = model::noNode;
     int auditionVelocity = 100;
     int auditionInstrument = 1;
+
+    std::vector<std::pair<model::InstrumentId, juce::String>> sampleChoices;
+    bool canLoadSample = true;
+    int trackInstrumentItem = 1;   // lo elegido, para volver a ello tras "Cargar muestra…"
+    int nodeInstrumentItem = 1;
 
     // Pista
     juce::Label trackHeader;

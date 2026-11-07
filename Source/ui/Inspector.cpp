@@ -20,6 +20,7 @@ namespace
     // Id del primer instrumento en los desplegables. En el del nodo, el id 1 es
     // "Como la pista" (instrumento 0 del modelo) y los instrumentos empiezan en 2.
     constexpr int nodeUsesTrackItem = 1;
+    constexpr int loadSampleItem = 900;   // "Cargar muestra…" en los dos desplegables
 
     int quantizeIndex (double beats)
     {
@@ -55,8 +56,7 @@ Inspector::Inspector()
     quantizeBox.addItemList ({ "Ajuste al pulso: libre", "Ajuste al pulso: 1", "Ajuste al pulso: 1/2", "Ajuste al pulso: 1/4" }, 1);
     directedToggle.setButtonText ("Grafo dirigido");
 
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-        trackInstrumentBox.addItem (text ("Instrumento: ") + text (model::instruments::name (static_cast<model::InstrumentId> (id))), id);
+    rebuildInstrumentBoxes();
 
     modeBox.onChange = [this]
     {
@@ -85,6 +85,14 @@ Inspector::Inspector()
     };
     trackInstrumentBox.onChange = [this]
     {
+        if (trackInstrumentBox.getSelectedId() == loadSampleItem)
+        {
+            trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
+            if (onLoadSample)
+                onLoadSample (false);
+            return;
+        }
+
         const auto id = static_cast<model::InstrumentId> (trackInstrumentBox.getSelectedId());
         callbacks.edit ([id] (model::Track& t) { t.instrument = id; });
     };
@@ -118,13 +126,17 @@ Inspector::Inspector()
     };
     piano.onPendingChanged = [this] { updateNotesDisplay(); };
 
-    nodeInstrumentBox.addItem ("Como la pista", nodeUsesTrackItem);
-    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
-        nodeInstrumentBox.addItem (text (model::instruments::name (static_cast<model::InstrumentId> (id))), id + 1);
-
     nodeInstrumentBox.onChange = [this]
     {
         const auto item = nodeInstrumentBox.getSelectedId();
+        if (item == loadSampleItem)
+        {
+            nodeInstrumentBox.setSelectedId (nodeInstrumentItem, juce::dontSendNotification);
+            if (onLoadSample)
+                onLoadSample (true);
+            return;
+        }
+
         const auto id = static_cast<model::InstrumentId> (item == nodeUsesTrackItem ? 0 : item - 1);
         editNode ([id] (model::Node& n) { n.instrument = id; });
     };
@@ -208,9 +220,9 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     traversalBox.setSelectedItemIndex (static_cast<int> (track.traversal), juce::dontSendNotification);
     siblingsBox.setSelectedItemIndex (static_cast<int> (track.siblings), juce::dontSendNotification);
     quantizeBox.setSelectedItemIndex (quantizeIndex (track.quantizeBeats), juce::dontSendNotification);
-    trackInstrumentBox.setSelectedId (static_cast<int> (model::instruments::isValid (track.instrument) ? track.instrument
-                                                                                                      : model::instruments::organ),
-                                      juce::dontSendNotification);
+    trackInstrumentItem = static_cast<int> (model::instruments::isValid (track.instrument) ? track.instrument
+                                                                                          : model::instruments::organ);
+    trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
     directedToggle.setToggleState (track.directed, juce::dontSendNotification);
 
     // Las opciones del algoritmo no aplican en el modo línea de tiempo.
@@ -243,9 +255,9 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     auditionInstrument = static_cast<int> (model::resolveInstrument (track, *n));
     piano.setPitches (n->pitches);
     updateNotesDisplay();
-    nodeInstrumentBox.setSelectedId (model::instruments::isValid (n->instrument) ? static_cast<int> (n->instrument) + 1
-                                                                                 : nodeUsesTrackItem,
-                                     juce::dontSendNotification);
+    nodeInstrumentItem = model::instruments::isValid (n->instrument) ? static_cast<int> (n->instrument) + 1
+                                                                     : nodeUsesTrackItem;
+    nodeInstrumentBox.setSelectedId (nodeInstrumentItem, juce::dontSendNotification);
     durationSlider.setValue (n->durationBeats, juce::dontSendNotification);
     velocitySlider.setValue (n->velocity, juce::dontSendNotification);
     startButton.setEnabled (track.startNode != n->id);
@@ -350,6 +362,54 @@ bool Inspector::handlePianoKeyStateChange()
         return false;
 
     return piano.handleKeyStateChange();
+}
+
+void Inspector::setSampleChoices (std::vector<std::pair<model::InstrumentId, juce::String>> samples, bool canLoadMore)
+{
+    if (samples == sampleChoices && canLoadMore == canLoadSample)
+        return;
+
+    sampleChoices = std::move (samples);
+    canLoadSample = canLoadMore;
+    rebuildInstrumentBoxes();
+}
+
+void Inspector::rebuildInstrumentBoxes()
+{
+    // Integrados, luego las muestras del proyecto y al final "Cargar muestra…".
+    trackInstrumentBox.clear (juce::dontSendNotification);
+    nodeInstrumentBox.clear (juce::dontSendNotification);
+    nodeInstrumentBox.addItem ("Como la pista", nodeUsesTrackItem);
+
+    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+    {
+        const auto name = text (model::instruments::name (static_cast<model::InstrumentId> (id)));
+        trackInstrumentBox.addItem (text ("Instrumento: ") + name, id);
+        nodeInstrumentBox.addItem (name, id + 1);
+    }
+
+    if (! sampleChoices.empty())
+    {
+        trackInstrumentBox.addSeparator();
+        nodeInstrumentBox.addSeparator();
+
+        for (const auto& [id, name] : sampleChoices)
+        {
+            trackInstrumentBox.addItem (text ("Instrumento: ") + name, static_cast<int> (id));
+            nodeInstrumentBox.addItem (name, static_cast<int> (id) + 1);
+        }
+    }
+
+    const auto loadText = canLoadSample ? text ("Cargar muestra…") : text ("Cargar muestra… (máximo 10)");
+    trackInstrumentBox.addSeparator();
+    nodeInstrumentBox.addSeparator();
+    trackInstrumentBox.addItem (loadText, loadSampleItem);
+    nodeInstrumentBox.addItem (loadText, loadSampleItem);
+    trackInstrumentBox.setItemEnabled (loadSampleItem, canLoadSample);
+    nodeInstrumentBox.setItemEnabled (loadSampleItem, canLoadSample);
+
+    trackInstrumentBox.setSelectedId (trackInstrumentItem, juce::dontSendNotification);
+    nodeInstrumentBox.setSelectedId (nodeInstrumentItem, juce::dontSendNotification);
 }
 
 } // namespace chimedes::ui

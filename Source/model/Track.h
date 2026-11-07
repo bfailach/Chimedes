@@ -75,11 +75,24 @@ struct Track
     bool operator== (const Track&) const = default;
 };
 
+// Una muestra de sonido cargada por el usuario, usada como instrumento: suena
+// transpuesta según la nota, con `rootNote` como la nota en que fue grabada.
+struct Sample
+{
+    InstrumentId id = 0;        // 7..16 (ver model/Instruments.h)
+    std::string name;           // para mostrar; por defecto, el nombre del archivo
+    std::string path;           // en memoria, absoluta; en el archivo, relativa si se puede
+    int rootNote = 60;
+
+    bool operator== (const Sample&) const = default;
+};
+
 struct Project
 {
     int formatVersion = 1;
     double bpm = 120.0;
     std::vector<Track> tracks;
+    std::vector<Sample> samples;
 
     bool operator== (const Project&) const = default;
 };

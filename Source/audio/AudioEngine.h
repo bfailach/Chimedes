@@ -9,6 +9,7 @@
 
 #include "engine/Schedule.h"
 #include "engine/Sequencer.h"
+#include "audio/SampleSynth.h"
 
 namespace chimedes::audio
 {
@@ -62,6 +63,11 @@ public:
     void previewNoteOff (int pitch, int instrument) noexcept;
     void previewAllNotesOff() noexcept;
 
+    // Reemplaza las muestras cargadas (instrumentos 7..16) en todas las pistas y en
+    // las notas de prueba. Las notas que estén sonando con una muestra quitada
+    // terminan con normalidad. Solo desde la interfaz.
+    void setSamples (const std::vector<SampleData>& samples);
+
 private:
     struct TrackSlot
     {
@@ -110,6 +116,18 @@ private:
     std::array<PreviewMessage, previewQueueSize> previewQueue {};
     juce::Synthesiser previewSynth;
     juce::MidiBuffer previewMidi;
+
+    static constexpr int sampleVoicesPerTrack = 12;
+
+    // Muestras quitadas: se conservan un rato para que nunca se liberen en el hilo
+    // de audio (una voz puede estar terminando de tocarlas).
+    struct RetiredSamples
+    {
+        std::vector<SampleData> samples;
+        int ticks = 0;
+    };
+    std::vector<SampleData> currentSamples;
+    std::vector<RetiredSamples> retiredSamples;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioEngine)
 };

@@ -139,3 +139,32 @@ TEST ("proyecto: varias pistas se guardan y abren en orden, con nombre y silenci
     CHECK (loaded.project.tracks == p.tracks);
     CHECK (loaded.project.tracks[2].muted);
 }
+
+TEST ("proyecto: las muestras se guardan y abren; las inválidas se descartan")
+{
+    model::Project p;
+    p.tracks = { model::makeDemoTrack() };
+    p.tracks[0].instrument = 7;
+    p.samples = { { 7, "Kalimba \"suave\"", "sonidos/kalimba.wav", 62 },
+                  { 9, "Voz", "C:\\Users\\bryan\\voz.wav", 60 } };
+
+    const auto loaded = model::projectFromJson (model::projectToJson (p));
+    CHECK (loaded.ok);
+    CHECK (loaded.project.samples == p.samples);
+    CHECK (loaded.project.tracks[0].instrument == 7);
+
+    const auto messy = model::projectFromJson (R"({ "format": "chimedes", "samples": [
+        { "id": 3, "path": "a.wav" }, { "id": 8, "path": "" }, { "id": 8, "path": "b.wav", "root": 300 },
+        { "id": 8, "path": "c.wav" } ] })");
+    CHECK (messy.ok);
+    CHECK (messy.project.samples.size() == 1);   // id 3 es integrado, sin ruta, repetido
+    CHECK (messy.project.samples[0].path == "b.wav");
+    CHECK (messy.project.samples[0].rootNote == 127);
+}
+
+TEST ("proyecto: sin muestras, el archivo no lleva la sección")
+{
+    model::Project p;
+    p.tracks = { model::makeDemoTrack() };
+    CHECK (model::projectToJson (p).find ("samples") == std::string::npos);
+}

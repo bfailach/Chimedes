@@ -507,8 +507,25 @@ std::string projectToJson (const Project& project)
         out += "    }";
     }
 
-    out += project.tracks.empty() ? "]\n" : "\n  ]\n";
-    out += "}\n";
+    out += project.tracks.empty() ? "]" : "\n  ]";
+
+    // Muestras: solo si hay alguna, para que los proyectos sin muestras no cambien.
+    if (! project.samples.empty())
+    {
+        out += ",\n  \"samples\": [";
+        for (std::size_t i = 0; i < project.samples.size(); ++i)
+        {
+            const auto& smp = project.samples[i];
+            out += i == 0 ? "\n" : ",\n";
+            out += "    { \"id\": " + std::to_string (smp.id)
+                 + ", \"name\": " + quoted (smp.name)
+                 + ", \"path\": " + quoted (smp.path)
+                 + ", \"root\": " + std::to_string (smp.rootNote) + " }";
+        }
+        out += "\n  ]";
+    }
+
+    out += "\n}\n";
     return out;
 }
 
@@ -552,6 +569,25 @@ ProjectLoadResult projectFromJson (const std::string& json)
             if (const auto* obj = item.object())
                 result.project.tracks.push_back (readTrack (*obj, nextTrack++));
     }
+
+    // Muestras: id entre 7 y 16, sin repetir y con ruta; las demás se descartan.
+    if (const auto* f = field (*object, "samples"); f != nullptr && f->array() != nullptr)
+        for (const auto& item : *f->array())
+            if (const auto* obj = item.object())
+            {
+                Sample smp;
+                smp.id = idOr (*obj, "id", 0);
+                if (const auto* path = stringOf (*obj, "path"))
+                    smp.path = *path;
+                if (const auto* name = stringOf (*obj, "name"))
+                    smp.name = *name;
+                smp.rootNote = static_cast<int> (std::clamp (std::round (numberOr (*obj, "root", 60.0)), 0.0, 127.0));
+
+                const bool duplicate = std::any_of (result.project.samples.begin(), result.project.samples.end(),
+                                                    [&smp] (const Sample& other) { return other.id == smp.id; });
+                if (smp.id >= 7 && smp.id <= 16 && ! smp.path.empty() && ! duplicate)
+                    result.project.samples.push_back (std::move (smp));
+            }
 
     if (result.project.tracks.empty())
     {

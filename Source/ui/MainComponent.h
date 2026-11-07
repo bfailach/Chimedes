@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -70,6 +71,12 @@ private:
     void deleteTrack (std::size_t index);
 
     void rebuildSchedules();
+
+    // Muestras de sonido
+    void syncSamples();                       // decodifica las nuevas y las pasa al motor
+    void loadSample (bool forNode);           // "Cargar muestra…"
+    std::shared_ptr<const juce::AudioBuffer<float>> decodeSample (const juce::File& file, double& sampleRate,
+                                                                  juce::String& error);
     void togglePlayPause();
     void updateUndoButtons();
 
@@ -143,6 +150,18 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
 
     juce::String audioWarning;
+    juce::String sampleWarning;   // muestras que no se encontraron
+
+    // Muestras ya decodificadas, por ruta: cargar el mismo archivo dos veces no lo
+    // vuelve a leer, y deshacer / rehacer no toca el disco.
+    struct DecodedSample
+    {
+        std::shared_ptr<const juce::AudioBuffer<float>> buffer;
+        double sampleRate = 44100.0;
+    };
+    std::map<std::string, DecodedSample> decodedSamples;
+    std::vector<model::Sample> syncedSamples;
+    juce::AudioFormatManager formatManager;
     int timerTicks = 0;
     bool initialFitDone = false;
 

@@ -149,6 +149,10 @@ MainComponent::MainComponent()
     graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (activeTrack(), node); };
     graphView.onActivateTrack = [this] (std::size_t index) { setActiveTrack (index); };
 
+    // --- Muestras ----------------------------------------------------------
+    formatManager.registerBasicFormats();
+    inspector.onLoadSample = [this] (bool forNode) { loadSample (forNode); };
+
     // --- Pistas ------------------------------------------------------------
     trackList.onSelect = [this] (std::size_t i) { setActiveTrack (i); };
     trackList.onAdd = [this] { addTrack(); };
@@ -313,6 +317,7 @@ void MainComponent::setActiveTrack (std::size_t index)
 
 void MainComponent::projectChanged()
 {
+    syncSamples();
     rebuildSchedules();
     inspector.refresh (activeTrack(), graphView.getSelectedNode());
     trackList.refresh (project, active);
@@ -402,7 +407,7 @@ void MainComponent::rebuildSchedules()
 
     graphView.setTracks (std::move (views), active);
 
-    const auto status = problem.isNotEmpty() ? problem : audioWarning;
+    const auto status = problem.isNotEmpty() ? problem : sampleWarning.isNotEmpty() ? sampleWarning : audioWarning;
     if (status != statusLabel.getText())
     {
         statusLabel.setText (status, juce::dontSendNotification);
@@ -601,6 +606,177 @@ void MainComponent::resized()
 }
 
 // ---------------------------------------------------------------------------
+// Muestras de sonido
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<const juce::AudioBuffer<float>> MainComponent::decodeSample (const juce::File& file, double& sampleRate,
+                                                                             juce::String& error)
+{
+    constexpr double maxSeconds = 30.0;
+
+    std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (file));
+    if (reader == nullptr)
+    {
+        error = file.existsAsFile() ? text ("Formato no reconocido (usa WAV, AIFF, FLAC u OGG).")
+                                    : text ("El archivo no existe.");
+        return nullptr;
+    }
+
+    // Hasta 30 segundos, en estéreo (una muestra mono se copia a los dos canales).
+    const auto length = static_cast<int> (std::min<juce::int64> (reader->lengthInSamples,
+                                                                 static_cast<juce::int64> (maxSeconds * reader->sampleRate)));
+    if (length < 2)
+    {
+        error = text ("El archivo está vacío.");
+        return nullptr;
+    }
+
+    auto buffer = std::make_shared<juce::AudioBuffer<float>> (2, length);
+    reader->read (buffer.get(), 0, length, 0, true, true);
+    if (reader->numChannels == 1)
+        buffer->copyFrom (1, 0, *buffer, 0, 0, length);
+
+    sampleRate = reader->sampleRate;
+    return buffer;
+}
+
+void MainComponent::syncSamples()
+{
+    std::vector<std::pair<model::InstrumentId, juce::String>> choices;
+    for (const auto& s : project.samples)
+        choices.emplace_back (s.id, juce::String::fromUTF8 (s.name.c_str()));
+    inspector.setSampleChoices (choices, project.samples.size() < static_cast<std::size_t> (model::instruments::maxSamples)
+                                             || std::any_of (project.samples.begin(), project.samples.end(), [this] (const model::Sample& s)
+                                                {
+                                                    return std::none_of (project.tracks.begin(), project.tracks.end(), [&s] (const model::Track& t)
+                                                    {
+                                                        return t.instrument == s.id
+                                                            || std::any_of (t.nodes.begin(), t.nodes.end(), [&s] (const model::Node& n) { return n.instrument == s.id; });
+                                                    });
+                                                }));
+
+    if (project.samples == syncedSamples)
+        return;
+
+    std::vector<audio::SampleData> data;
+    juce::StringArray missing;
+
+    for (const auto& s : project.samples)
+    {
+        auto it = decodedSamples.find (s.path);
+        if (it == decodedSamples.end())
+        {
+            DecodedSample decoded;
+            juce::String error;
+            decoded.buffer = decodeSample (juce::File (juce::String::fromUTF8 (s.path.c_str())), decoded.sampleRate, error);
+            if (decoded.buffer == nullptr)
+            {
+                missing.add (juce::String::fromUTF8 (s.name.c_str()));
+                continue;
+            }
+            it = decodedSamples.emplace (s.path, std::move (decoded)).first;
+        }
+
+        data.push_back ({ static_cast<int> (s.id), it->second.buffer, it->second.sampleRate, s.rootNote });
+    }
+
+    engine.setSamples (data);
+    syncedSamples = project.samples;
+
+    // Si falta alguna, se avisa; esa muestra queda en silencio hasta que vuelva.
+    sampleWarning = missing.isEmpty() ? juce::String()
+                  : (missing.size() == 1 ? text ("No se encontró la muestra ") : text ("No se encontraron las muestras "))
+                        + missing.joinIntoString (", ");
+}
+
+void MainComponent::loadSample (bool forNode)
+{
+    const auto node = graphView.getSelectedNode();
+    const auto trackIndex = active;
+
+    fileChooser = std::make_unique<juce::FileChooser> (text ("Cargar muestra de sonido"), defaultFolder(),
+                                                       formatManager.getWildcardForAllFormats());
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [this, forNode, node, trackIndex] (const juce::FileChooser& chooser)
+    {
+        const auto file = chooser.getResult();
+        if (file == juce::File())
+            return;
+
+        DecodedSample decoded;
+        juce::String error;
+        decoded.buffer = decodeSample (file, decoded.sampleRate, error);
+        if (decoded.buffer == nullptr)
+        {
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (text ("No se pudo cargar ") + file.getFileName())
+                                              .withMessage (error)
+                                              .withButton ("Aceptar"),
+                                          nullptr);
+            return;
+        }
+
+        const auto path = file.getFullPathName().toStdString();
+        decodedSamples[path] = std::move (decoded);
+
+        applyProjectEdit ([&] (model::Project& p)
+        {
+            // La misma muestra ya cargada se reutiliza; si no hay sitio, se quitan las
+            // que ninguna pista ni nodo usa.
+            model::InstrumentId id = 0;
+            for (const auto& s : p.samples)
+                if (s.path == path)
+                    id = s.id;
+
+            if (id == 0 && model::freeSampleId (p) == 0)
+            {
+                const auto used = [&p] (model::InstrumentId sid)
+                {
+                    return std::any_of (p.tracks.begin(), p.tracks.end(), [sid] (const model::Track& t)
+                    {
+                        return t.instrument == sid
+                            || std::any_of (t.nodes.begin(), t.nodes.end(), [sid] (const model::Node& n) { return n.instrument == sid; });
+                    });
+                };
+                p.samples.erase (std::remove_if (p.samples.begin(), p.samples.end(),
+                                                 [&used] (const model::Sample& s) { return ! used (s.id); }),
+                                 p.samples.end());
+            }
+
+            if (id == 0)
+            {
+                id = model::freeSampleId (p);
+                if (id == 0)
+                    return;   // diez muestras en uso: el desplegable ya lo avisa
+
+                model::Sample s;
+                s.id = id;
+                s.name = file.getFileNameWithoutExtension().toStdString();
+                s.path = path;
+                p.samples.push_back (s);
+            }
+
+            if (trackIndex >= p.tracks.size())
+                return;
+
+            auto& t = p.tracks[trackIndex];
+            if (! forNode)
+            {
+                t.instrument = id;
+            }
+            else
+            {
+                for (auto& n : t.nodes)
+                    if (n.id == node)
+                        n.instrument = id;
+            }
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Archivos
 // ---------------------------------------------------------------------------
 
@@ -769,9 +945,18 @@ void MainComponent::openFile (const juce::File& file)
     graphView.selectNode (model::noNode);
     undoManager.clearUndoHistory();
 
+    // Rutas de muestras relativas a la carpeta del proyecto → absolutas.
+    auto opened = loaded.project;
+    for (auto& s : opened.samples)
+    {
+        const auto path = juce::String::fromUTF8 (s.path.c_str());
+        if (! juce::File::isAbsolutePath (path))
+            s.path = file.getParentDirectory().getChildFile (path).getFullPathName().toStdString();
+    }
+
     currentFile = file;
     bpmSlider.setValue (loaded.project.bpm, juce::sendNotificationSync);
-    setProject (loaded.project, 0);
+    setProject (opened, 0);
     markSaved();
 
     graphView.zoomToFit (freeCanvasArea());
@@ -828,6 +1013,16 @@ bool MainComponent::writeFile (const juce::File& file)
 {
     auto toSave = project;
     toSave.bpm = engine.getBpm();
+
+    // Las muestras dentro de la carpeta del proyecto se guardan con ruta relativa:
+    // así se puede mover o compartir la carpeta entera.
+    const auto folder = file.getParentDirectory();
+    for (auto& s : toSave.samples)
+    {
+        const juce::File sampleFile (juce::String::fromUTF8 (s.path.c_str()));
+        if (sampleFile.isAChildOf (folder))
+            s.path = sampleFile.getRelativePathFrom (folder).replaceCharacter ('\\', '/').toStdString();
+    }
 
     // Se escribe en un temporal y luego se reemplaza: si algo falla, el archivo
     // anterior queda intacto.

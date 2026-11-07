@@ -20,13 +20,13 @@ Fase 2 completa:
 - [x] Modo algoritmo: árboles, recorridos, hermanos en secuencia o a la vez y ajuste al pulso
 - [x] Guardar y abrir proyectos (`.chimedes`)
 
-Fase 3, en curso:
+Fase 3 completa:
 
 - [x] Varias pistas que suenan a la vez, cada una con su ciclo
 - [x] Edición en vivo mientras suena
-- [ ] Muestras de sonido propias como instrumentos
+- [x] Muestras de sonido propias como instrumentos
 
-Después: fase 4 (aleatorizar todos los parámetros, exportar a WAV y MIDI).
+Siguiente: fase 4 (aleatorizar todos los parámetros, exportar a WAV y MIDI).
 
 ## Uso
 
@@ -78,7 +78,13 @@ Al abrir, los campos que falten toman su valor por defecto, los valores fuera de
 
 ## Instrumentos
 
-Seis instrumentos sintetizados, sin archivos de audio: órgano, piano eléctrico (FM), campana (FM inarmónica), cuerda pulsada (Karplus-Strong), pad (dos sierras desafinadas y filtradas) y bajo. Cada instrumento suena por su propio canal MIDI, así que en una misma pista pueden convivir varios. Las muestras grabadas llegan en la fase 3.
+Seis instrumentos sintetizados, sin archivos de audio: órgano, piano eléctrico (FM), campana (FM inarmónica), cuerda pulsada (Karplus-Strong), pad (dos sierras desafinadas y filtradas) y bajo. Cada instrumento suena por su propio canal MIDI, así que en una misma pista pueden convivir varios.
+
+### Muestras propias
+
+En el desplegable de instrumento (de la pista o de un nodo), **Cargar muestra…** abre un archivo WAV, AIFF, FLAC u OGG (hasta 30 segundos) y lo usa como instrumento: la muestra se toma como grabada en do central (C4) y se transpone para cada nota. Un proyecto admite hasta diez muestras; si no hay sitio, se quitan las que nadie usa. Volver a cargar el mismo archivo reutiliza la muestra.
+
+El proyecto guarda la ruta del archivo, no el audio. Si la muestra está dentro de la carpeta del proyecto, la ruta se guarda relativa, así que se puede mover o compartir la carpeta entera. Si al abrir falta un archivo, aparece un aviso y esa muestra queda en silencio; el resto del proyecto suena normal.
 
 ## Aleatorio
 

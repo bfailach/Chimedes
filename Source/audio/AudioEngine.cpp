@@ -25,6 +25,9 @@ AudioEngine::AudioEngine()
 
         for (int i = 0; i < voicesPerTrack; ++i)
             slot->synth.addVoice (new InstrumentVoice());
+
+        for (int i = 0; i < sampleVoicesPerTrack; ++i)
+            slot->synth.addVoice (new SampleVoice());
     }
 
     for (int id = model::instruments::first; id <= model::instruments::count; ++id)
@@ -32,6 +35,9 @@ AudioEngine::AudioEngine()
 
     for (int i = 0; i < 16; ++i)
         previewSynth.addVoice (new InstrumentVoice());
+
+    for (int i = 0; i < 8; ++i)
+        previewSynth.addVoice (new SampleVoice());
 }
 
 AudioEngine::~AudioEngine() = default;
@@ -184,8 +190,36 @@ void AudioEngine::publishSchedule (int slot, std::shared_ptr<const engine::Sched
     slots[static_cast<std::size_t> (slot)]->pending.store (raw, std::memory_order_release);
 }
 
+void AudioEngine::setSamples (const std::vector<SampleData>& samples)
+{
+    const auto replace = [&samples] (juce::Synthesiser& synth)
+    {
+        for (int i = synth.getNumSounds(); --i >= 0;)
+            if (dynamic_cast<SampleSound*> (synth.getSound (i).get()) != nullptr)
+                synth.removeSound (i);
+
+        for (const auto& s : samples)
+            if (s.buffer != nullptr && s.buffer->getNumSamples() > 1)
+                synth.addSound (new SampleSound (s));
+    };
+
+    for (auto& slot : slots)
+        replace (slot->synth);
+    replace (previewSynth);
+
+    retiredSamples.push_back ({ std::move (currentSamples), 0 });
+    currentSamples = samples;
+}
+
 void AudioEngine::collectGarbage()
 {
+    // Muestras quitadas hace un par de segundos: ninguna voz las puede estar usando.
+    for (auto& r : retiredSamples)
+        ++r.ticks;
+    retiredSamples.erase (std::remove_if (retiredSamples.begin(), retiredSamples.end(),
+                                          [] (const RetiredSamples& r) { return r.ticks > 8; }),
+                          retiredSamples.end());
+
     // Un horario retirado se libera tras dos llamadas (cientos de milisegundos, mucho
     // más que un bloque de audio) y solo si el audio no lo está usando.
     for (auto& p : published)
