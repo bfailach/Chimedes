@@ -572,9 +572,10 @@ void MainComponent::rebuildSchedules()
                                   juce::String::fromUTF8 (model::instrumentDisplayName (project, t.instrument).c_str()));
         }
 
-    // Behind the track window, the main canvas keeps showing the track it was opened from.
+    // The canvas shows only one track (graphs never overlap): the active one, or,
+    // behind the track window, the track it was opened from. The others keep playing.
     const auto mainActive = glance != nullptr ? std::min (glanceReturnIndex, project.tracks.size() - 1) : active;
-    graphView.setTracks (std::move (views), mainActive);
+    graphView.setTracks ({ views[mainActive] }, 0);
 
     const auto status = problem.isNotEmpty() ? problem : sampleWarning.isNotEmpty() ? sampleWarning : audioWarning;
     if (status != statusLabel.getText())
@@ -908,6 +909,13 @@ void MainComponent::applyRandom (RandomKind kind)
     // A new shape is framed in the canvas being edited (the track window, if open).
     if (newShape)
         frameEditor();
+
+    // Playback starts again from the beginning: if it was playing, it keeps playing
+    // from beat 0; if it was paused, it goes back to the start.
+    if (engine.isPlaying())
+        engine.restart();
+    else if (engine.getPositionBeats() > 0.0)
+        engine.stop();
 }
 
 // ---------------------------------------------------------------------------

@@ -20,9 +20,9 @@ namespace chimedes::ui
 // in neighbouring colours; the path played stays as a pastel trail until the next
 // cycle starts.
 //
-// With several tracks, all of them are drawn and animated at once; the active track
-// is drawn in full and is the only one that can be edited, the others are dimmed (a
-// click on one of their stars makes that track active). It is also the editor:
+// The window passes it a single track (graphs never overlap on screen); the code can
+// still draw extra tracks dimmed underneath, each with its own animation. It is also
+// the editor:
 //
 //   double-click on empty space .. create node
 //   drag the centre .............. move node

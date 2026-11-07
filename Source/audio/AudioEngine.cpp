@@ -250,6 +250,14 @@ void AudioEngine::stop() noexcept
     stopRequested.store (true);
 }
 
+void AudioEngine::restart() noexcept
+{
+    // The audio thread handles the stop request before reading `playing`, so the
+    // next block rewinds and plays on.
+    stopRequested.store (true);
+    playing.store (true);
+}
+
 void AudioEngine::pushPreview (const PreviewMessage& message) noexcept
 {
     const auto scope = previewFifo.write (1);

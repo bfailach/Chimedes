@@ -46,6 +46,9 @@ public:
     void play() noexcept;
     void pause() noexcept;
     void stop() noexcept;
+
+    // Back to beat 0 and keep playing (stop + play in the same audio block).
+    void restart() noexcept;
     bool isPlaying() const noexcept { return playing.load(); }
 
     void setBpm (double newBpm) noexcept;

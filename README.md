@@ -56,8 +56,8 @@ The app opens with a demo graph; the **New** button (sheet icon) starts an empty
 | Try notes | Click the panel's keyboard or press **A W S E D F T G Y H U J K O L P** (from C to the D♯ of the next octave, starting at the first visible C). They sound right away. Several letters at once, or Shift, make a chord; **Z / X** change octave |
 | Save the note or chord | **Enter** (Esc discards the proposal) |
 | New, open, save | Sheet, folder and floppy-disk icons in the top bar (next to the project name), or **Ctrl+N**, **Ctrl+O**, **Ctrl+S** (**Ctrl+Shift+S**: save as). Before closing, opening another project or starting a new one, the app asks if there are unsaved changes |
-| Tracks | Left panel: a click makes a track active (the one you edit; the others are dimmed and keep playing), a double-click renames it, the speaker mutes it, **+** adds one (up to 16) and a right-click duplicates or deletes. Clicking a dimmed star also activates its track. Everything can be undone |
-| New track window | **+** opens the new track in a floating window inside the app (like Zen Browser's Glance), over the dimmed canvas. Edit it there with the right panel and the transport as usual. Buttons beside it: **close** (Esc or a click outside; the track stays and you go back), **expand** (it becomes the active track on the main canvas) and **discard** (deletes it; can be undone) |
+| Tracks | Left panel: a click makes a track active (the one shown and edited on the canvas; the others keep playing but are not drawn, so graphs never overlap), a double-click renames it, the speaker mutes it, **+** adds one (up to 16) and a right-click duplicates or deletes. Everything can be undone |
+| New track window | **+** opens the new track in a floating window inside the app (like Zen Browser's Glance), over the dimmed canvas, which keeps showing the previous track. Edit it there with the right panel and the transport as usual. Buttons beside it: **close** (Esc or a click outside; the track stays and you go back), **expand** (it becomes the active track on the main canvas) and **discard** (deletes it; can be undone) |
 | Random | **Dice** (or **R**): randomizes the active track right away. **Options** (sliders icon): choose what the dice randomizes (graph, notes, rhythm, instruments, algorithm, everything, or everything on every track); the choice is applied at once and the dice remembers it. Can be undone |
 | Export | Tray icon in the top bar: **WAV** (audio, 48 kHz, 24-bit) or **MIDI**, choosing the length |
 | Zoom | Mouse wheel |
@@ -81,7 +81,7 @@ Fonts: [Space Grotesk](https://github.com/floriankarsten/space-grotesk) for the 
 
 ## Several tracks
 
-Each track is an independent graph with its own options (mode, tree, traversal, instrument) and its own cycle: a 3-beat track against a 4-beat one gives a polyrhythm that repeats every 12 beats. All tracks share the BPM and the canvas; the active one is drawn in full and the others dimmed, still flashing as they play. New tracks get a different instrument so they can be told apart by ear.
+Each track is an independent graph with its own options (mode, tree, traversal, instrument) and its own cycle: a 3-beat track against a 4-beat one gives a polyrhythm that repeats every 12 beats. All tracks share the BPM; the canvas only shows the active track, so graphs never overlap, while the others keep playing. New tracks get a different instrument so they can be told apart by ear.
 
 ## Projects
 
@@ -101,7 +101,7 @@ The project stores the file's path, not the audio. If the sample is inside the p
 
 ## Random
 
-The dice randomizes right away; the options button next to it chooses what the dice does (by default, a new graph). Choosing an option also applies it. Everything applies to the active track, except the last option, and can be undone:
+The dice randomizes right away; the options button next to it chooses what the dice does (by default, a new graph). Choosing an option also applies it. After randomizing, playback starts again from the beginning (if it was paused, it goes back to the start). Everything applies to the active track, except the last option, and can be undone:
 
 - **New graph**: see below.
 - **Notes**: same shape, new scale and key; the melody follows the edges from the start and the end goes back to the tonic.

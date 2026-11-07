@@ -116,6 +116,15 @@ void GraphView::setPlayhead (double positionBeats, bool isPlaying, double bpm)
             if (layer.schedule != nullptr && layer.schedule->cycleLengthBeats > 0.0)
                 layer.animBeat = std::min (layer.animBeat, std::fmod (positionBeats, layer.schedule->cycleLengthBeats)) - 1.0e-6;
 
+    // Restarted from the beginning while playing: every track starts a fresh cycle
+    // (otherwise the notes left in the old cycle would flash as it "wraps").
+    if (isPlaying && playing && positionBeats + 1e-6 < playheadBeat)
+        for (auto& layer : layers)
+        {
+            startNewCycle (layer, nowMs());
+            layer.animBeat = -1.0e-6;
+        }
+
     if (std::abs (positionBeats - playheadBeat) > 1e-9 || isPlaying != playing)
         playheadMs = nowMs();
 
