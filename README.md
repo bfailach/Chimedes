@@ -29,8 +29,10 @@ La aplicación abre con un grafo de demostración; el botón **Nuevo** (icono de
 | Seleccionar | Clic en un nodo o una arista |
 | Borrar | Supr o Retroceso, con algo seleccionado |
 | Inicio y fin | Clic derecho en un nodo, o los botones del panel derecho |
-| Notas del nodo | Teclado del panel derecho: clic elige una nota, Mayús+clic forma acordes; `<` `>` cambian de octava |
+| Notas del nodo | Teclado del panel derecho: clic propone una nota y la hace sonar, Mayús+clic forma acordes; `<` `>` cambian de octava. La propuesta se marca con borde blanco y se guarda con Enter |
 | Instrumento | Panel derecho: uno para la pista y, si quieres, otro para cada nodo |
+| Probar notas | Clic en el teclado del panel o letras **A W S E D F T G Y H U J K O L P** (de do a re♯ de la octava siguiente, desde el primer do visible). Suenan al momento. Varias letras a la vez o Mayús forman un acorde; **Z / X** cambian de octava |
+| Guardar la nota o el acorde | **Enter** (Esc descarta la propuesta) |
 | Grafo al azar | Botón **Aleatorio** (icono de dado; se puede deshacer) |
 | Zoom | Rueda del ratón |
 | Desplazarse | Arrastrar en un espacio vacío, o con el botón central |

@@ -25,15 +25,27 @@ public:
     // Alto que necesita para mostrar todo su contenido.
     int getIdealHeight() const;
 
+    // Notas de prueba del teclado: velocidad 0 = apagar. El instrumento ya viene
+    // resuelto (el del nodo o el de la pista).
+    std::function<void (int pitch, int velocity, int instrument)> onAudition;
+
+    // Teclado de la computadora para el piano (solo con un nodo seleccionado).
+    bool handlePianoKeyPress (const juce::KeyPress& key);
+    bool handlePianoKeyStateChange();
+    void releasePianoKeys() { piano.releaseAllKeys(); }
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
 private:
     int layout (bool apply);  // coloca los controles (si apply) y devuelve el alto total
     void editNode (const std::function<void (model::Node&)>& change);
+    void updateNotesDisplay();
     void connectSlider (juce::Slider& slider, std::function<void (model::Node&, double)> apply);
 
     model::NodeId node = model::noNode;
+    int auditionVelocity = 100;
+    int auditionInstrument = 1;
 
     // Pista
     juce::Label trackHeader;

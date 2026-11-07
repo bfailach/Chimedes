@@ -30,6 +30,8 @@ public:
     void paint (juce::Graphics& g) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress& key) override;
+    bool keyStateChanged (bool isKeyDown) override;
+    void focusLost (FocusChangeType cause) override;
 
 private:
     class TrackChange;

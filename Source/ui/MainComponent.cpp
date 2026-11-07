@@ -115,6 +115,15 @@ MainComponent::MainComponent()
     graphView.callbacks = editCallbacks;
     inspector.callbacks = editCallbacks;
     graphView.onSelectionChanged = [this] (model::NodeId node) { inspector.refresh (track, node); };
+
+    // Notas de prueba del teclado del panel: suenan al momento, aunque no se reproduzca.
+    inspector.onAudition = [this] (int pitch, int velocity, int instrument)
+    {
+        if (velocity > 0)
+            engine.previewNoteOn (pitch, velocity, instrument);
+        else
+            engine.previewNoteOff (pitch, instrument);
+    };
     graphView.setTrack (&track);
 
     // El lienzo ocupa toda la ventana; los paneles flotan encima.
@@ -260,6 +269,10 @@ void MainComponent::togglePlayPause()
 
 void MainComponent::timerCallback()
 {
+    // Si la app pasa a segundo plano con una tecla sostenida, nunca llegaría su "soltar".
+    if (! juce::Process::isForegroundProcess())
+        inspector.releasePianoKeys();
+
     const auto position = engine.getPositionBeats();
     const auto cycle = schedule != nullptr ? schedule->cycleLengthBeats : 0.0;
     const auto beatInCycle = cycle > 0.0 ? std::fmod (position, cycle) : 0.0;
@@ -275,6 +288,11 @@ void MainComponent::timerCallback()
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     const auto command = juce::ModifierKeys::commandModifier;  // Ctrl en Windows y Linux, Cmd en macOS
+
+    // Con un nodo seleccionado, las letras tocan el piano y Enter / Esc guardan o
+    // descartan la nota propuesta.
+    if (inspector.handlePianoKeyPress (key))
+        return true;
 
     if (key == juce::KeyPress::spaceKey)
     {
@@ -302,6 +320,19 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
 
     return false;
+}
+
+bool MainComponent::keyStateChanged (bool)
+{
+    // Al bajar y al soltar letras: así suenan mientras se sostienen y forman acordes.
+    return inspector.handlePianoKeyStateChange();
+}
+
+void MainComponent::focusLost (FocusChangeType)
+{
+    // Si la ventana pierde el foco con una tecla sostenida, nunca llegaría su "soltar".
+    if (! hasKeyboardFocus (true))
+        inspector.releasePianoKeys();
 }
 
 // ---------------------------------------------------------------------------

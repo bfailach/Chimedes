@@ -97,7 +97,7 @@ Inspector::Inspector()
     // --- Nodo --------------------------------------------------------------
     styleHeader (nodeHeader, "Nodo");
     styleCaption (notesLabel, "Notas");
-    styleCaption (notesHint, "Clic: una nota · Mayús+clic: acorde");
+    styleCaption (notesHint, "Clic o letras A–K: probar · Mayús: acorde");
     styleCaption (instrumentLabel, "Instrumento");
     styleCaption (durationLabel, "Duración (pulsos)");
     styleCaption (velocityLabel, "Intensidad");
@@ -106,10 +106,17 @@ Inspector::Inspector()
     notesValue.setJustificationType (juce::Justification::centredRight);
     notesValue.setColour (juce::Label::textColourId, theme::textPrimary);
 
-    piano.onChange = [this] (std::vector<int> pitches)
+    // Tocar el piano prueba la nota; Enter la guarda en el nodo (se puede deshacer).
+    piano.onCommit = [this] (std::vector<int> pitches)
     {
         editNode ([p = std::move (pitches)] (model::Node& n) { n.pitches = p; });
     };
+    piano.onAudition = [this] (int pitch, bool isDown)
+    {
+        if (onAudition)
+            onAudition (pitch, isDown ? auditionVelocity : 0, auditionInstrument);
+    };
+    piano.onPendingChanged = [this] { updateNotesDisplay(); };
 
     nodeInstrumentBox.addItem ("Como la pista", nodeUsesTrackItem);
     for (int id = model::instruments::first; id <= model::instruments::count; ++id)
@@ -212,7 +219,15 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
         c->setEnabled (algorithm);
 
     const auto* n = track.findNode (selectedNode);
-    node = n != nullptr ? n->id : model::noNode;
+    const auto newNode = n != nullptr ? n->id : model::noNode;
+
+    // Otro nodo: la propuesta del anterior se descarta y se apagan las notas de prueba.
+    if (newNode != node)
+    {
+        piano.releaseAllKeys();
+        piano.discardPending();
+    }
+    node = newNode;
 
     for (auto* c : std::initializer_list<juce::Component*> {
              &notesLabel, &notesValue, &piano, &notesHint, &instrumentLabel, &nodeInstrumentBox, &durationLabel,
@@ -224,8 +239,10 @@ void Inspector::refresh (const model::Track& track, model::NodeId selectedNode)
     if (n == nullptr)
         return;
 
-    notesValue.setText (juce::String (model::pitchNames (n->pitches)), juce::dontSendNotification);
+    auditionVelocity = n->velocity;
+    auditionInstrument = static_cast<int> (model::resolveInstrument (track, *n));
     piano.setPitches (n->pitches);
+    updateNotesDisplay();
     nodeInstrumentBox.setSelectedId (model::instruments::isValid (n->instrument) ? static_cast<int> (n->instrument) + 1
                                                                                  : nodeUsesTrackItem,
                                      juce::dontSendNotification);
@@ -306,6 +323,33 @@ int Inspector::layout (bool apply)
 
     place (deleteButton, rowH, 0);
     return y + padY;
+}
+
+void Inspector::updateNotesDisplay()
+{
+    // Con una propuesta sin guardar, las notas y la ayuda pasan a blanco estelar.
+    const bool proposing = piano.hasPendingChange();
+
+    notesValue.setText (juce::String (model::pitchNames (piano.getPendingPitches())), juce::dontSendNotification);
+    notesValue.setColour (juce::Label::textColourId, proposing ? theme::accent : theme::textPrimary);
+
+    notesHint.setText (text (proposing ? "Enter: guardar · Esc: descartar"
+                                       : "Clic o letras A–K: probar · Mayús: acorde"),
+                       juce::dontSendNotification);
+    notesHint.setColour (juce::Label::textColourId, proposing ? theme::accent : theme::textSecondary);
+}
+
+bool Inspector::handlePianoKeyPress (const juce::KeyPress& key)
+{
+    return node != model::noNode && piano.handleKeyPress (key);
+}
+
+bool Inspector::handlePianoKeyStateChange()
+{
+    if (node == model::noNode)
+        return false;
+
+    return piano.handleKeyStateChange();
 }
 
 } // namespace chimedes::ui

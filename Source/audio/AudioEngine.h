@@ -17,7 +17,8 @@ namespace chimedes::audio
 // sirve para la tarjeta de sonido y para el renderizado sin conexión (exportar WAV).
 //
 // Reglas de hilos:
-//   - publishSchedule, play, pause, stop, setBpm y collectGarbage: solo desde la interfaz.
+//   - publishSchedule, play, pause, stop, setBpm, collectGarbage y las notas de prueba
+//     (previewNoteOn/Off): solo desde la interfaz.
 //   - getNextAudioBlock: solo desde el hilo de audio. No asigna, no bloquea.
 //   - Los horarios viejos nunca se liberan en el hilo de audio: collectGarbage lo hace
 //     en la interfaz cuando el audio ya no puede estar usándolos.
@@ -55,6 +56,12 @@ public:
     // Libera los horarios retirados que el audio ya no usa. Llamar periódicamente.
     void collectGarbage();
 
+    // Notas de prueba (al tocar el teclado del panel). Suenan aunque no se esté
+    // reproduciendo y no afectan a las pistas. Si la cola está llena, se descartan.
+    void previewNoteOn (int pitch, int velocity, int instrument) noexcept;
+    void previewNoteOff (int pitch, int instrument) noexcept;
+    void previewAllNotesOff() noexcept;
+
 private:
     struct TrackSlot
     {
@@ -72,6 +79,16 @@ private:
         int retiredTicks = -1;  // -1 = vigente
     };
 
+    struct PreviewMessage
+    {
+        int pitch = 0;          // -1 = apagar todas
+        int velocity = 0;       // 0 = note-off
+        int instrument = 1;
+    };
+
+    void pushPreview (const PreviewMessage& message) noexcept;
+    void renderPreview (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+
     void renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer,
                       int startSample, int numSamples, double fromBeat, double beatsPerSample);
 
@@ -86,6 +103,13 @@ private:
 
     double sampleRate = 44100.0;
     double position = 0.0;  // solo el audio
+
+    // Cola sin bloqueos de la interfaz al audio (un productor, un consumidor).
+    static constexpr int previewQueueSize = 256;
+    juce::AbstractFifo previewFifo { previewQueueSize };
+    std::array<PreviewMessage, previewQueueSize> previewQueue {};
+    juce::Synthesiser previewSynth;
+    juce::MidiBuffer previewMidi;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioEngine)
 };

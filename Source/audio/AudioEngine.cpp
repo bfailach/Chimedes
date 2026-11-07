@@ -26,6 +26,12 @@ AudioEngine::AudioEngine()
         for (int i = 0; i < voicesPerTrack; ++i)
             slot->synth.addVoice (new InstrumentVoice());
     }
+
+    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+        previewSynth.addSound (new InstrumentSound (id));
+
+    for (int i = 0; i < 16; ++i)
+        previewSynth.addVoice (new InstrumentVoice());
 }
 
 AudioEngine::~AudioEngine() = default;
@@ -43,6 +49,9 @@ void AudioEngine::prepareToPlay (int, double newSampleRate)
         slot->synth.setCurrentPlaybackSampleRate (newSampleRate);
         slot->midi.ensureSize (8192);  // para no asignar dentro del ciclo de audio
     }
+
+    previewSynth.setCurrentPlaybackSampleRate (newSampleRate);
+    previewMidi.ensureSize (4096);
 }
 
 void AudioEngine::releaseResources()
@@ -103,6 +112,34 @@ void AudioEngine::getNextAudioBlock (const juce::AudioSourceChannelInfo& block)
         position += block.numSamples * beatsPerSample;
         positionBeats.store (position);
     }
+
+    renderPreview (*block.buffer, block.startSample, block.numSamples);
+}
+
+void AudioEngine::renderPreview (juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
+{
+    previewMidi.clear();
+
+    const auto scope = previewFifo.read (previewFifo.getNumReady());
+    const auto take = [&] (int start, int count)
+    {
+        for (int i = start; i < start + count; ++i)
+        {
+            const auto& m = previewQueue[static_cast<std::size_t> (i)];
+            const auto channel = std::clamp (m.instrument, 1, 16);
+
+            if (m.pitch < 0)
+                previewMidi.addEvent (juce::MidiMessage::allNotesOff (channel), startSample);
+            else if (m.velocity > 0)
+                previewMidi.addEvent (juce::MidiMessage::noteOn (channel, m.pitch, static_cast<juce::uint8> (std::clamp (m.velocity, 1, 127))), startSample);
+            else
+                previewMidi.addEvent (juce::MidiMessage::noteOff (channel, m.pitch), startSample);
+        }
+    };
+    take (scope.startIndex1, scope.blockSize1);
+    take (scope.startIndex2, scope.blockSize2);
+
+    previewSynth.renderNextBlock (buffer, previewMidi, startSample, numSamples);
 }
 
 void AudioEngine::renderTrack (TrackSlot& slot, juce::AudioBuffer<float>& buffer,
@@ -177,6 +214,31 @@ void AudioEngine::stop() noexcept
 {
     playing.store (false);
     stopRequested.store (true);
+}
+
+void AudioEngine::pushPreview (const PreviewMessage& message) noexcept
+{
+    const auto scope = previewFifo.write (1);
+    if (scope.blockSize1 > 0)
+        previewQueue[static_cast<std::size_t> (scope.startIndex1)] = message;
+    else if (scope.blockSize2 > 0)
+        previewQueue[static_cast<std::size_t> (scope.startIndex2)] = message;
+}
+
+void AudioEngine::previewNoteOn (int pitch, int velocity, int instrument) noexcept
+{
+    pushPreview ({ std::clamp (pitch, 0, 127), std::max (1, velocity), instrument });
+}
+
+void AudioEngine::previewNoteOff (int pitch, int instrument) noexcept
+{
+    pushPreview ({ std::clamp (pitch, 0, 127), 0, instrument });
+}
+
+void AudioEngine::previewAllNotesOff() noexcept
+{
+    for (int id = model::instruments::first; id <= model::instruments::count; ++id)
+        pushPreview ({ -1, 0, id });
 }
 
 void AudioEngine::setBpm (double newBpm) noexcept
